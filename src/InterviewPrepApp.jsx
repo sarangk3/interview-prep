@@ -210,7 +210,7 @@ export default function InterviewPrepApp() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+          model: 'claude-sonnet-4-6', max_tokens: 1000,
           meta: { role, industry, question: q, sessionId: sessionMeta.sessionId },
           messages: [{ role: 'user', content:
 `You are a strict, senior interviewer at a top-tier tech company evaluating a candidate for a ${role} role${industryCtx}. You do not inflate scores. You give the score the answer actually deserves.
