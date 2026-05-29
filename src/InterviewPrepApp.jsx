@@ -194,7 +194,7 @@ export default function InterviewPrepApp() {
     const bank = QUESTION_BANK[industry][r][format];
     const qs = m === 'full' ? bank : [bank[Math.floor(Math.random() * bank.length)]];
     setRole(r); setMode(m); setQIndex(0); setSessionQs(qs);
-    setSessionMeta({ role: r, mode: m, format, industry });
+    setSessionMeta({ role: r, mode: m, format, industry, sessionId: Math.random().toString(36).slice(2) });
     setAllResponses([]); setResponse(''); setMcChoice(null);
     setResults(null); setEmailDone(false); setEmailInput('');
     setPage('interview');
@@ -211,6 +211,7 @@ export default function InterviewPrepApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+          meta: { role, industry, question: q, sessionId: sessionMeta.sessionId },
           messages: [{ role: 'user', content:
 `You are a strict, senior interviewer at a top-tier tech company evaluating a candidate for a ${role} role${industryCtx}. You do not inflate scores. You give the score the answer actually deserves.
 
@@ -256,6 +257,25 @@ Respond ONLY in this JSON (no markdown):
     const ok = mcChoice === q.correct;
     const next = [...allResponses, { question: q.q, options: q.options, chosen: mcChoice, correct: q.correct, isCorrect: ok, explanation: q.explanation }];
     setAllResponses(next);
+
+    // Log to Airtable (fire and forget)
+    fetch('/api/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId:    sessionMeta.sessionId,
+        role,
+        industry,
+        format:       'mc',
+        question:     q.q,
+        options:      q.options,
+        chosenIndex:  mcChoice,
+        correctIndex: q.correct,
+        isCorrect:    ok,
+        explanation:  q.explanation,
+      }),
+    }).catch(() => {});
+
     if (qIndex + 1 < sessionQs.length) { setQIndex(qIndex + 1); setMcChoice(null); }
     else finishInterview(next, 'mc');
   };
