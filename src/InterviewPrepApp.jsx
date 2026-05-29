@@ -213,14 +213,24 @@ export default function InterviewPrepApp() {
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514', max_tokens: 1000,
           messages: [{ role: 'user', content:
-`You are a senior interviewer evaluating a candidate for a ${role} role${industryCtx}.
+`You are a strict, senior interviewer at a top-tier tech company evaluating a candidate for a ${role} role${industryCtx}. You do not inflate scores. You give the score the answer actually deserves.
+
+Scoring scale (apply rigorously):
+1-3: Poor — vague, wrong, or shows little understanding
+4-5: Below average — some relevant points but major gaps, no structure, or too shallow
+6: Average — covers the basics but missing depth, trade-offs, or specifics
+7: Good — solid answer with clear structure and relevant detail, minor gaps only
+8: Strong — thorough, well-structured, covers trade-offs, shows real experience
+9-10: Exceptional — reserve for answers that would impress at FAANG/top startups
+
+A rambling or generic answer that restates the question without substance scores 3-4. Do not give a 6 out of politeness.
 
 Question: "${q}"
 Candidate's Answer: "${response}"
 
-Score 1-10 each. Be honest — most answers score 5-7, exceptional ones 8-10.
+Evaluate ruthlessly and honestly across all four dimensions. If the answer is weak, say so clearly in the feedback.
 Respond ONLY in this JSON (no markdown):
-{"technical_depth":7,"communication_clarity":6,"structure":7,"approach":7,"overall":7,"strengths":["s1","s2"],"improvements":["i1","i2"],"feedback":"2-3 sentences, direct and actionable.","key_points":["A concrete point a strong answer covers","Another key point","A third key point"]}` }],
+{"technical_depth":7,"communication_clarity":6,"structure":7,"approach":7,"overall":7,"strengths":["specific strength 1","specific strength 2"],"improvements":["specific gap 1","specific gap 2"],"feedback":"2-3 sentences of direct, honest feedback. Name what was missing or wrong, not just what to improve.","key_points":["A concrete point a strong answer covers","Another key point","A third key point"]}` }],
         }),
       });
       const data = await res.json();
