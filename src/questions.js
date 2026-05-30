@@ -345,3 +345,31 @@ export const QUESTION_BANK = {
   'Fintech':     { 'AI Solutions Architect': AISA.Fintech,     'Forward Deployed Engineer': FDE.Fintech,     'Forward Deployed Product Manager': FDPM.Fintech,     'Technical Program Manager': TPM.Fintech },
   'E-commerce':  { 'AI Solutions Architect': AISA['E-commerce'],'Forward Deployed Engineer': FDE['E-commerce'],'Forward Deployed Product Manager': FDPM['E-commerce'],'Technical Program Manager': TPM['E-commerce'] },
 };
+
+/* ── Opening problems for Mock Interview mode ── */
+export const OPENING_PROBLEMS = {
+  'AI Solutions Architect': {
+    'General':     { title: 'Enterprise AI Knowledge Assistant', problem: "A 600-person professional services firm wants to build an internal AI assistant that can answer questions using their 10 years of project documentation, client reports, and internal wikis. Employees waste 2 hours a day searching for information. Walk me through how you'd approach this." },
+    'Healthcare':  { title: 'Clinical Documentation AI', problem: "A large academic medical center wants to deploy an AI system to help physicians reduce clinical documentation time by 50%. Physicians currently spend 3 hours per day on notes. Walk me through how you'd design this system." },
+    'Fintech':     { title: 'Real-Time Fraud Detection', problem: "A digital bank processing 5 million transactions daily wants to build an AI-powered fraud detection system that makes decisions in under 100ms with a false positive rate below 0.1%. Walk me through your approach." },
+    'E-commerce':  { title: 'AI Shopping Assistant', problem: "A fashion marketplace with 20 million SKUs and 15 million monthly active users wants to build a personalized AI shopping assistant that improves conversion by 15%. Walk me through how you'd approach this." },
+  },
+  'Forward Deployed Engineer': {
+    'General':     { title: 'Supply Chain Visibility Platform', problem: "A Fortune 500 manufacturing company wants a real-time supply chain visibility platform. They have 12 legacy ERP systems, no unified API layer, inconsistent data formats, and need a working MVP in 90 days. Where do you start?" },
+    'Healthcare':  { title: 'Multi-EHR Patient Data Unification', problem: "A regional hospital network wants to unify patient records across 6 different EHR systems to enable care coordination. Their IT team is understaffed, change-averse, and two of the systems are 15 years old with no modern APIs. Walk me through your approach." },
+    'Fintech':     { title: 'Real-Time Lending Risk Dashboard', problem: "A regional bank wants a real-time lending risk dashboard pulling data from 4 core banking systems. Their data is inconsistent, partially in mainframes, and they have a board presentation in 60 days. Where do you start?" },
+    'E-commerce':  { title: 'Omnichannel Inventory Unification', problem: "A large retailer wants to unify online and in-store inventory across 400 locations into a single real-time view. They have 8 existing systems, seasonal peak in 10 weeks, and their current inventory accuracy is 73%. Walk me through your approach." },
+  },
+  'Forward Deployed Product Manager': {
+    'General':     { title: 'Enterprise Churn Crisis', problem: "A Series B SaaS company brought you in — their enterprise customers are churning at 30% annually and they don't know why. You have 60 days, full access to customers, data, and engineering. Walk me through how you'd approach diagnosing and fixing this." },
+    'Healthcare':  { title: 'Clinical Platform Adoption Crisis', problem: "A health system deployed your care coordination platform to 300 clinicians 4 months ago. Adoption is at 25% and declining. The CMO is losing patience and threatening to pull the contract. Walk me through how you'd diagnose and turn this around." },
+    'Fintech':     { title: 'SMB Lending Product Strategy', problem: "A digital lending startup wants to expand from consumer personal loans into SMB lending. You're embedded with them for 90 days to define the product strategy and go-to-market approach. Walk me through how you'd tackle this." },
+    'E-commerce':  { title: 'Marketplace Seller Satisfaction Crisis', problem: "A marketplace with 3 million sellers has seen seller satisfaction drop 20% in 6 months and churn is accelerating. You're embedded to diagnose the problem and build a roadmap. Walk me through your approach." },
+  },
+  'Technical Program Manager': {
+    'General':     { title: 'Failing Platform Migration', problem: "You've just taken over as TPM for a 12-team, 18-month platform migration. It's 4 months in, 6 weeks behind schedule, there's no dependency map, and three teams are blocked on each other. Walk me through how you'd stabilize this program." },
+    'Healthcare':  { title: 'Clinical System Multi-Site Rollout', problem: "You're leading the rollout of a new clinical decision support system across 8 hospital sites with a hard regulatory compliance deadline in 5 months. Two sites are actively resisting. Walk me through how you'd run this program." },
+    'Fintech':     { title: 'Compliance + Migration Collision', problem: "You're driving a PCI-DSS Level 1 recertification across 6 engineering teams while simultaneously migrating to a new payment processor. Both have hard deadlines in the same quarter and are competing for the same engineers. Walk me through your approach." },
+    'E-commerce':  { title: 'Black Friday Readiness at Risk', problem: "You're the TPM for peak-season readiness at a major retailer. It's September, Black Friday is 11 weeks away, 4 critical integrations aren't finished, load tests haven't started, and two team leads just gave notice. Walk me through how you'd run this." },
+  },
+};

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { QUESTION_BANK, INDUSTRIES, ROLES } from './questions';
+import { QUESTION_BANK, INDUSTRIES, ROLES, OPENING_PROBLEMS } from './questions';
 
 const G = () => (
   <style>{`
@@ -28,6 +28,10 @@ const G = () => (
     .chip{padding:6px 16px;border-radius:20px;border:1px solid #E5E7EB;background:#fff;color:#6B7280;font-size:13px;cursor:pointer;transition:all .15s;font-weight:500;}
     .chip.on{border-color:#6366F1;background:#EEF2FF;color:#4F46E5;font-weight:600;} .chip:hover:not(.on){border-color:#A5B4FC;}
     .mic-live{animation:recPulse 1.4s ease-in-out infinite;}
+    .msg-interviewer{background:#F3F4F6;color:#111827;border-radius:4px 18px 18px 18px;align-self:flex-start;max-width:75%;}
+    .msg-candidate{background:#6366F1;color:#fff;border-radius:18px 4px 18px 18px;align-self:flex-end;max-width:75%;}
+    .thinking-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9CA3AF;animation:bounce .9s ease-in-out infinite;}
+    @keyframes bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-6px);}}
     @media(max-width:768px){
       .sb{display:none!important;} .isp{flex-direction:column!important;}
       .ap{width:100%!important;border-left:none!important;border-top:1px solid #E5E7EB!important;}
@@ -143,6 +147,12 @@ export default function InterviewPrepApp() {
   const [interviews,setInterviews] = useState([]);
   const [savedEmail,setSavedEmail] = useState(null);
   const [format,setFormat]         = useState('text');
+  const [difficulty,setDifficulty] = useState('medium');
+  const [mockMessages,setMockMessages]   = useState([]);
+  const [mockTurnCount,setMockTurnCount] = useState(0);
+  const [mockThinking,setMockThinking]   = useState(false);
+  const [mockScore,setMockScore]         = useState(null);
+  const [openingProblem,setOpeningProblem] = useState(null);
   const [industry,setIndustry]     = useState('General');
   const [role,setRole]             = useState(null);
   const [mode,setMode]             = useState(null);
@@ -160,33 +170,80 @@ export default function InterviewPrepApp() {
   const [elapsed,setElapsed]       = useState(0);
   const [listening,setListening]   = useState(false);
   const recRef = useRef(null);
+  const chatEndRef = useRef(null);
   const speechOk = typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition);
 
   useEffect(()=>{ const s=localStorage.getItem('ipData'); if(s){const d=JSON.parse(s);setInterviews(d.interviews||[]);setSavedEmail(d.email||null);} },[]);
   useEffect(()=>{ if(page==='results'){const t=setTimeout(()=>setBarsAnim(true),400);return()=>clearTimeout(t);} setBarsAnim(false); },[page]);
   useEffect(()=>{ if(page!=='interview'){setElapsed(0);return;} const t=setInterval(()=>setElapsed(e=>e+1),1000);return()=>clearInterval(t); },[page]);
   useEffect(()=>setElapsed(0),[qIndex]);
+  useEffect(()=>{ chatEndRef.current?.scrollIntoView({behavior:'smooth'}); },[mockMessages,mockThinking]);
   useEffect(()=>()=>{try{recRef.current?.stop();}catch(e){}},[qIndex,page]);
 
   const persist=(ivs,email)=>localStorage.setItem('ipData',JSON.stringify({interviews:ivs,email:email??savedEmail}));
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
   const wc=response.trim().split(/\s+/).filter(Boolean).length;
 
+  const MOCK_TURNS = { easy:3, medium:5, hard:7 };
+
   const startInterview=(r,m)=>{
-    const bank=QUESTION_BANK[industry][r][format];
-    const key=`${r}-${industry}-${format}`;
-    let qs;
-    if(m==='full'){
-      qs=shuffle(bank);
-    } else {
-      const {q}=getNextQuestion(bank,key);
-      qs=[q];
-    }
-    setRole(r);setMode(m);setQIndex(0);setSessionQs(qs);
-    setSessionMeta({role:r,mode:m,format,industry,sessionId:Math.random().toString(36).slice(2)});
+    setRole(r);setMode(m);
     setAllResponses([]);setResponse('');setMcChoice(null);
     setResults(null);setEmailDone(false);setEmailInput('');
+    setMockScore(null);setMockTurnCount(0);setMockThinking(false);
+
+    if(format==='mock'){
+      const prob=OPENING_PROBLEMS[r]?.[industry]||OPENING_PROBLEMS[r]?.['General'];
+      setOpeningProblem(prob.problem);
+      setMockMessages([{role:'interviewer',content:prob.problem}]);
+      setSessionMeta({role:r,mode:'mock',format:'mock',industry,sessionId:Math.random().toString(36).slice(2),problemTitle:prob.title});
+    } else {
+      const bank=QUESTION_BANK[industry][r][format];
+      const key=`${r}-${industry}-${format}`;
+      const qs=m==='full'?shuffle(bank):[getNextQuestion(bank,key).q];
+      setQIndex(0);setSessionQs(qs);
+      setSessionMeta({role:r,mode:m,format,industry,sessionId:Math.random().toString(36).slice(2)});
+    }
     setPage('interview');
+  };
+
+  const submitMockResponse=async()=>{
+    if(!response.trim()||mockThinking)return;
+    const newTurn=mockTurnCount+1;
+    const maxTurns=MOCK_TURNS[difficulty]||5;
+    const candidateMsg={role:'candidate',content:response.trim()};
+    const updatedMessages=[...mockMessages,candidateMsg];
+    setMockMessages(updatedMessages);
+    setResponse('');
+    setMockThinking(true);
+
+    try{
+      // Get next interviewer response
+      const res=await fetch('/api/mock',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({mode:'turn',messages:updatedMessages,role,industry,difficulty,turn:newTurn,maxTurns,openingProblem})});
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||'Failed.');
+      const withReply=[...updatedMessages,{role:'interviewer',content:data.reply}];
+      setMockMessages(withReply);
+      setMockTurnCount(newTurn);
+
+      // If this was the final turn, get scores
+      if(newTurn>=maxTurns){
+        const scoreRes=await fetch('/api/mock',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({mode:'score',messages:withReply,role,industry,difficulty,openingProblem})});
+        const scoreData=await scoreRes.json();
+        if(scoreRes.ok&&scoreData.score){
+          setMockScore(scoreData.score);
+          // Save to history
+          const iv={id:Date.now(),role,mode:'mock',format:'mock',industry,difficulty,
+            date:new Date().toISOString(),score:scoreData.score.overall,
+            problemTitle:sessionMeta.problemTitle,messages:withReply,mockScore:scoreData.score};
+          const updated=[...interviews,iv];setInterviews(updated);persist(updated);
+          setPage('results');
+        }
+      }
+    }catch(err){alert(typeof err==='string'?err:err?.message||'Error. Please try again.');}
+    finally{setMockThinking(false);}
   };
 
   const toggleListening=()=>{
@@ -279,7 +336,80 @@ export default function InterviewPrepApp() {
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
 
           {/* ════ INTERVIEW ════ */}
-          {page==='interview' && q && cfg && (
+          {page==='interview' && format==='mock' && (
+            <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden',background:'#F9FAFB'}}>
+              {/* Header */}
+              <div style={{background:'#fff',borderBottom:'1px solid #E5E7EB',padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                  <button className="bg" onClick={()=>setPage('home')} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
+                  {role&&ROLE_CFG[role]&&<div style={{padding:'3px 10px',borderRadius:20,background:ROLE_CFG[role].bg,border:`1px solid ${ROLE_CFG[role].border}`,fontSize:12,fontWeight:600,color:ROLE_CFG[role].color}}>{role}</div>}
+                  <div style={{padding:'3px 10px',borderRadius:20,background:'#F9FAFB',border:'1px solid #E5E7EB',fontSize:12,color:'#6B7280'}}>{industry}</div>
+                  <div style={{padding:'3px 10px',borderRadius:20,fontSize:12,fontWeight:600,
+                    background:difficulty==='easy'?'#F0FDF4':difficulty==='medium'?'#FFFBEB':'#FEF2F2',
+                    color:difficulty==='easy'?'#059669':difficulty==='medium'?'#D97706':'#DC2626'}}>
+                    {difficulty.charAt(0).toUpperCase()+difficulty.slice(1)}
+                  </div>
+                </div>
+                <div style={{fontSize:13,color:'#9CA3AF',flexShrink:0}}>Round {mockTurnCount} of {MOCK_TURNS[difficulty]||5}</div>
+              </div>
+              {/* Progress */}
+              <div style={{height:3,background:'#F3F4F6',flexShrink:0}}>
+                <div style={{height:'100%',background:'#6366F1',width:`${(mockTurnCount/(MOCK_TURNS[difficulty]||5))*100}%`,transition:'width .5s ease'}}/>
+              </div>
+              {/* Chat messages */}
+              <div style={{flex:1,overflowY:'auto',padding:'24px',display:'flex',flexDirection:'column',gap:16}}>
+                {mockMessages.map((msg,i)=>(
+                  <div key={i} style={{display:'flex',flexDirection:'column',alignItems:msg.role==='candidate'?'flex-end':'flex-start'}}>
+                    <div style={{fontSize:11,color:'#9CA3AF',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',padding:'0 4px'}}>
+                      {msg.role==='interviewer'?'Interviewer':'You'}
+                    </div>
+                    <div className={`msg-${msg.role}`} style={{padding:'14px 18px',fontSize:14,lineHeight:1.7}}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {mockThinking&&(
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start'}}>
+                    <div style={{fontSize:11,color:'#9CA3AF',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',padding:'0 4px'}}>Interviewer</div>
+                    <div className="msg-interviewer" style={{padding:'14px 18px',display:'flex',gap:5,alignItems:'center'}}>
+                      <span className="thinking-dot" style={{animationDelay:'0s'}}/>
+                      <span className="thinking-dot" style={{animationDelay:'.2s'}}/>
+                      <span className="thinking-dot" style={{animationDelay:'.4s'}}/>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef}/>
+              </div>
+              {/* Input area */}
+              {mockTurnCount<(MOCK_TURNS[difficulty]||5)&&!mockThinking&&(
+                <div style={{background:'#fff',borderTop:'1px solid #E5E7EB',padding:'16px 24px',flexShrink:0}}>
+                  <div style={{position:'relative'}}>
+                    <textarea value={response} onChange={e=>setResponse(e.target.value)}
+                      onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))submitMockResponse();}}
+                      placeholder="Type your response here... (Cmd+Enter to submit)"
+                      style={{width:'100%',minHeight:100,padding:'14px',paddingBottom:48,border:'1px solid #E5E7EB',borderRadius:12,fontSize:14,
+                        lineHeight:1.6,color:'#111827',background:'#F9FAFB',display:'block',
+                        borderColor:response.length>50?'#A5B4FC':'#E5E7EB',transition:'border-color .2s'}}/>
+                    {speechOk&&(
+                      <button className={`bg ${listening?'mic-live':''}`} onClick={toggleListening}
+                        style={{position:'absolute',left:12,bottom:10,display:'flex',alignItems:'center',gap:6,padding:'5px 10px',fontSize:12,fontWeight:600,
+                          borderColor:listening?'#FCA5A5':'#E5E7EB',color:listening?'#EF4444':'#9CA3AF'}}>
+                        🎤 {listening?'Listening…':'Speak'}
+                      </button>
+                    )}
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:10}}>
+                    <span style={{fontSize:12,color:'#D1D5DB'}}>{response.trim().split(/\s+/).filter(Boolean).length} words · Cmd+Enter to send</span>
+                    <button className="bp" onClick={submitMockResponse} disabled={response.trim().length<5||mockThinking}
+                      style={{padding:'10px 24px',fontSize:14}}>
+                      Respond →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {page==='interview' && format!=='mock' && q && cfg && (
             <div className="isp" style={{display:'flex',flex:1,overflow:'hidden'}}>
               {/* Left — question (stable, no key that changes) */}
               <div style={{flex:1,padding:'28px 32px',overflowY:'auto',borderRight:'1px solid #E5E7EB',background:'#F9FAFB'}}>
@@ -378,8 +508,9 @@ export default function InterviewPrepApp() {
                     <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Answer format</p>
                     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                       {[{id:'text',label:'Written Response',desc:'AI scores your answer in depth'},
-                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline'}].map(f=>(
-                        <div key={f.id} onClick={()=>setFormat(f.id)} style={{flex:1,minWidth:200,padding:'14px 16px',borderRadius:10,cursor:'pointer',
+                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline'},
+                        {id:'mock',label:'Mock Interview',    desc:'Dynamic back-and-forth with an AI interviewer'}].map(f=>(
+                        <div key={f.id} onClick={()=>setFormat(f.id)} style={{flex:1,minWidth:180,padding:'14px 16px',borderRadius:10,cursor:'pointer',
                           border:format===f.id?'2px solid #6366F1':'1px solid #E5E7EB',background:format===f.id?'#F5F3FF':'#fff',transition:'all .15s'}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                             <span style={{fontSize:14,fontWeight:600,color:format===f.id?'#4F46E5':'#111827'}}>{f.label}</span>
@@ -390,6 +521,24 @@ export default function InterviewPrepApp() {
                       ))}
                     </div>
                   </div>
+                  {/* Difficulty — only for mock */}
+                  {format==='mock'&&(
+                    <div className="fu d1" style={{marginBottom:24}}>
+                      <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Difficulty</p>
+                      <div style={{display:'flex',gap:8}}>
+                        {[{id:'easy',label:'Easy',desc:'3 rounds · Supportive'},
+                          {id:'medium',label:'Medium',desc:'5 rounds · Challenging'},
+                          {id:'hard',label:'Hard',desc:'7 rounds · Rigorous'}].map(d=>(
+                          <div key={d.id} onClick={()=>setDifficulty(d.id)} style={{flex:1,padding:'12px 14px',borderRadius:10,cursor:'pointer',transition:'all .15s',
+                            border:difficulty===d.id?`2px solid ${d.id==='easy'?'#059669':d.id==='medium'?'#D97706':'#DC2626'}`:'1px solid #E5E7EB',
+                            background:difficulty===d.id?`${d.id==='easy'?'#F0FDF4':d.id==='medium'?'#FFFBEB':'#FEF2F2'}`:'#fff'}}>
+                            <p style={{fontSize:13,fontWeight:600,color:difficulty===d.id?(d.id==='easy'?'#059669':d.id==='medium'?'#D97706':'#DC2626'):'#374151',marginBottom:2}}>{d.label}</p>
+                            <p style={{fontSize:11,color:'#9CA3AF'}}>{d.desc}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {/* Industry */}
                   <div className="fu d2" style={{marginBottom:28}}>
                     <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Industry focus</p>
@@ -404,27 +553,29 @@ export default function InterviewPrepApp() {
                   {/* Full mock */}
                   <div className="fu d3" style={{marginBottom:28}}>
                     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
-                      <h2 style={{fontSize:16,fontWeight:600,color:'#111827'}}>Full Mock Interview</h2>
-                      <span style={{fontSize:11,background:'#F3F4F6',color:'#6B7280',padding:'3px 10px',borderRadius:20}}>5 questions</span>
+                      <h2 style={{fontSize:16,fontWeight:600,color:'#111827'}}>{format==='mock'?'Mock Interview':'Full Mock Interview'}</h2>
+                      <span style={{fontSize:11,background:'#F3F4F6',color:'#6B7280',padding:'3px 10px',borderRadius:20}}>{format==='mock'?`${MOCK_TURNS[difficulty]||5} rounds`:'5 questions'}</span>
                     </div>
                     <div className="rg" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
                       {ROLES.map(r=>{
                         const c=ROLE_CFG[r];
+                        const prob=format==='mock'?(OPENING_PROBLEMS[r]?.[industry]||OPENING_PROBLEMS[r]?.['General']):null;
                         return (
                           <div key={r} className="rc" onClick={()=>startInterview(r,'full')}>
                             <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:12}}>
                               <div style={{width:36,height:36,borderRadius:8,background:c.bg,border:`1px solid ${c.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>{c.icon}</div>
-                              <span style={{fontSize:11,color:'#9CA3AF',background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:20,padding:'3px 10px'}}>5 Qs</span>
+                              <span style={{fontSize:11,color:'#9CA3AF',background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:20,padding:'3px 10px'}}>{format==='mock'?`${MOCK_TURNS[difficulty]||5} rounds`:'5 Qs'}</span>
                             </div>
                             <p style={{fontWeight:600,fontSize:14,color:'#111827',marginBottom:4}}>{r}</p>
-                            <p style={{fontSize:12,color:'#9CA3AF',marginBottom:14}}>{c.label}</p>
+                            {prob?<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14,lineHeight:1.4}}>{prob.title}</p>:<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14}}>{c.label}</p>}
                             <span style={{fontSize:12,color:'#6366F1',fontWeight:600}}>Start →</span>
                           </div>
                         );
                       })}
                     </div>
                   </div>
-                  {/* Quick */}
+                  {/* Quick practice — hidden for mock */}
+                  {format!=='mock'&&(
                   <div className="fu d4">
                     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
                       <h2 style={{fontSize:16,fontWeight:600,color:'#111827'}}>Quick Practice</h2>
@@ -445,11 +596,110 @@ export default function InterviewPrepApp() {
                       })}
                     </div>
                   </div>
+                  )}
                 </div>
               )}
 
+              {/* ── MOCK RESULTS ── */}
+              {page==='results' && format==='mock' && mockScore && (()=>{
+                const cfgR=role?ROLE_CFG[role]:null;
+                const oc=mockScore.overall>=8?'#059669':mockScore.overall>=6?'#2563EB':'#D97706';
+                const ol=mockScore.overall>=8?'Excellent':mockScore.overall>=6?'Good':mockScore.overall>=4?'Developing':'Needs Work';
+                return (
+                  <div className="mp" style={{maxWidth:760,margin:'0 auto',padding:'36px 32px'}}>
+                    <div className="fu" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:24,flexWrap:'wrap',gap:16}}>
+                      <div>
+                        <button className="bg" onClick={()=>setPage('home')} style={{padding:'5px 12px',fontSize:13,marginBottom:12}}>← Home</button>
+                        <h1 style={{fontSize:22,fontWeight:700,color:'#111827',marginBottom:8}}>Mock Interview Feedback</h1>
+                        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                          {cfgR&&<span style={{fontSize:12,background:cfgR.bg,border:`1px solid ${cfgR.border}`,color:cfgR.color,padding:'3px 10px',borderRadius:20,fontWeight:600}}>{role}</span>}
+                          <span style={{fontSize:12,background:'#F9FAFB',border:'1px solid #E5E7EB',color:'#6B7280',padding:'3px 10px',borderRadius:20}}>{industry}</span>
+                          <span style={{fontSize:12,padding:'3px 10px',borderRadius:20,fontWeight:600,
+                            background:difficulty==='easy'?'#F0FDF4':difficulty==='medium'?'#FFFBEB':'#FEF2F2',
+                            color:difficulty==='easy'?'#059669':difficulty==='medium'?'#D97706':'#DC2626'}}>
+                            {difficulty.charAt(0).toUpperCase()+difficulty.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="card" style={{textAlign:'center',padding:'16px 28px'}}>
+                        <div style={{fontSize:40,fontWeight:700,color:oc,lineHeight:1}}>{mockScore.overall}</div>
+                        <div style={{fontSize:12,color:'#9CA3AF',marginTop:2}}>out of 10</div>
+                        <div style={{fontSize:12,fontWeight:600,color:oc,marginTop:4}}>{ol}</div>
+                      </div>
+                    </div>
+                    {/* 5-dimension scores */}
+                    <div className="card fu d1" style={{padding:'20px 24px',marginBottom:14,display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
+                      {[{k:'structure',l:'Structure'},{k:'depth',l:'Depth'},{k:'problem_solving',l:'Problem Solving'},{k:'adaptability',l:'Adaptability'},{k:'communication',l:'Communication'}].map(d=>(
+                        <ScorePill key={d.k} label={d.l} value={mockScore[d.k]}/>
+                      ))}
+                    </div>
+                    {/* Summary */}
+                    <div className="card fu d2" style={{padding:'20px 24px',marginBottom:14}}>
+                      <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:8}}>Overall Assessment</p>
+                      <p style={{fontSize:14,color:'#4B5563',lineHeight:1.7}}>{mockScore.summary}</p>
+                    </div>
+                    {/* Strengths + improvements */}
+                    <div className="s2 fu d3" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+                      <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:12,padding:'16px 18px'}}>
+                        <p style={{fontSize:11,fontWeight:700,color:'#15803D',marginBottom:10,textTransform:'uppercase',letterSpacing:'.05em'}}>Strengths</p>
+                        {mockScore.strengths.map((s,j)=><div key={j} style={{display:'flex',gap:8,marginBottom:8}}><span style={{color:'#22C55E',fontWeight:700,flexShrink:0}}>+</span><p style={{fontSize:13,color:'#166534',lineHeight:1.5}}>{s}</p></div>)}
+                      </div>
+                      <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:12,padding:'16px 18px'}}>
+                        <p style={{fontSize:11,fontWeight:700,color:'#B45309',marginBottom:10,textTransform:'uppercase',letterSpacing:'.05em'}}>To Improve</p>
+                        {mockScore.improvements.map((s,j)=><div key={j} style={{display:'flex',gap:8,marginBottom:8}}><span style={{color:'#F59E0B',fontWeight:700,flexShrink:0}}>→</span><p style={{fontSize:13,color:'#78350F',lineHeight:1.5}}>{s}</p></div>)}
+                      </div>
+                    </div>
+                    {/* Conversation transcript */}
+                    <div className="card fu d4" style={{padding:'20px 24px',marginBottom:14}}>
+                      <p style={{fontSize:14,fontWeight:600,color:'#111827',marginBottom:16}}>Full Conversation</p>
+                      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                        {mockMessages.map((msg,i)=>(
+                          <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',flexDirection:msg.role==='candidate'?'row-reverse':'row'}}>
+                            <div style={{width:28,height:28,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,
+                              background:msg.role==='candidate'?'#6366F1':'#F3F4F6',color:msg.role==='candidate'?'#fff':'#9CA3AF'}}>
+                              {msg.role==='candidate'?'Y':'I'}
+                            </div>
+                            <div style={{flex:1,padding:'12px 16px',borderRadius:msg.role==='candidate'?'18px 4px 18px 18px':'4px 18px 18px 18px',
+                              background:msg.role==='candidate'?'#EEF2FF':'#F9FAFB',
+                              border:`1px solid ${msg.role==='candidate'?'#C7D2FE':'#E5E7EB'}`}}>
+                              <p style={{fontSize:13,color:'#374151',lineHeight:1.6}}>{msg.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Email + CTAs */}
+                    <div className="card" style={{padding:'20px 24px',marginBottom:14}}>
+                      {!emailDone?(
+                        <>
+                          <p style={{fontSize:14,fontWeight:600,color:'#111827',marginBottom:4}}>Get a copy of your session</p>
+                          <p style={{fontSize:13,color:'#9CA3AF',marginBottom:14}}>Enter your email to download the full conversation and scores.</p>
+                          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                            <input type="email" placeholder="you@email.com" value={emailInput} onChange={e=>setEmailInput(e.target.value)}
+                              style={{flex:1,minWidth:180,padding:'10px 14px',border:'1px solid #E5E7EB',borderRadius:8,fontSize:14,background:'#F9FAFB',color:'#111827'}}/>
+                            <button className="bp" onClick={submitEmail} disabled={!emailInput.trim()} style={{padding:'10px 20px',fontSize:14}}>Download</button>
+                          </div>
+                        </>
+                      ):(
+                        <div style={{display:'flex',alignItems:'center',gap:14}}>
+                          <div style={{width:40,height:40,borderRadius:10,background:'#F0FDF4',border:'1px solid #BBF7D0',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>✅</div>
+                          <div style={{flex:1}}>
+                            <p style={{fontSize:14,fontWeight:600,color:'#111827'}}>Download started</p>
+                            <p style={{fontSize:13,color:'#9CA3AF',marginTop:2}}>Check your downloads folder.</p>
+                          </div>
+                          <button className="bg" onClick={downloadCopy} style={{padding:'8px 16px',fontSize:13}}>Download again</button>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{display:'flex',gap:10}}>
+                      <button className="bp" onClick={()=>startInterview(role,'full')} style={{flex:1,padding:'13px',fontSize:14}}>Try Again</button>
+                      <button className="bg" onClick={()=>setPage('home')} style={{flex:1,padding:'13px',fontSize:14}}>Choose Another Role</button>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* ── RESULTS ── */}
-              {page==='results' && results && (()=>{
+              {page==='results' && results && format!=='mock' && (()=>{
                 const isMCr=results[0]&&'isCorrect' in results[0];
                 const cfgR=role?ROLE_CFG[role]:null;
                 const avg=isMCr?Math.round((results.filter(r=>r.isCorrect).length/results.length)*10):Math.round(results.reduce((s,r)=>s+r.feedback.overall,0)/results.length);
