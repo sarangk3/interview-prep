@@ -13,8 +13,12 @@ const GEMINI_URL = model =>
 const GROQ_URL       = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Best free model on OpenRouter — high quality, no cost
-const OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+// Primary free model, fallback if it errors
+const OPENROUTER_MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'mistralai/mistral-7b-instruct:free',
+  'google/gemma-3-27b-it:free',
+];
 
 /**
  * callLLM({ system, userMessages, temperature, maxTokens })
@@ -38,7 +42,7 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
       const body = { contents, generationConfig: { temperature, maxOutputTokens: maxTokens } };
       if (system) body.system_instruction = { parts: [{ text: system }] };
 
-      const res  = await fetch(GEMINI_URL('gemini-2.0-flash-lite'), {
+      const res  = await fetch(GEMINI_URL('gemini-1.5-flash'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -60,41 +64,43 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
     }
   }
 
-  /* ── 2. OpenRouter (free Llama 3.3 70B) ──────────────────── */
+  /* ── 2. OpenRouter (tries multiple free models) ──────────── */
   if (openrouterKey) {
-    try {
-      const messages = [];
-      if (system) messages.push({ role: 'system', content: system });
-      messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
+    for (const model of OPENROUTER_MODELS) {
+      try {
+        const messages = [];
+        if (system) messages.push({ role: 'system', content: system });
+        messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
 
-      const res  = await fetch(OPENROUTER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openrouterKey}`,
-          'HTTP-Referer': 'https://ai-interview.solutions',
-          'X-Title': 'AI Interview Prep',
-        },
-        body: JSON.stringify({ model: OPENROUTER_MODEL, max_tokens: maxTokens, temperature, messages }),
-      });
-      const data = await res.json();
+        const res  = await fetch(OPENROUTER_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openrouterKey}`,
+            'HTTP-Referer': 'https://ai-interview.solutions',
+            'X-Title': 'AI Interview Prep',
+          },
+          body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages }),
+        });
+        const data = await res.json();
 
-      if (res.status === 429 || res.status >= 500) {
-        const reason = data?.error?.message || res.status;
-        errors.push(`OpenRouter: ${reason}`);
-        console.warn(`OpenRouter unavailable (${reason}), trying Groq…`);
-      } else if (!res.ok) {
-        throw new Error(data?.error?.message || `OpenRouter HTTP ${res.status}`);
-      } else {
+        if (res.status === 429 || res.status >= 500 || data?.error) {
+          const reason = data?.error?.message || res.status;
+          console.warn(`OpenRouter model ${model} unavailable (${reason}), trying next…`);
+          continue; // try next model
+        }
+
         const text = data?.choices?.[0]?.message?.content;
-        if (!text) throw new Error('Empty OpenRouter response');
-        console.log('Served by: openrouter');
+        if (!text) { console.warn(`OpenRouter model ${model} returned empty, trying next…`); continue; }
+        console.log(`Served by: openrouter (${model})`);
         return { text, provider: 'openrouter' };
+
+      } catch (err) {
+        console.warn(`OpenRouter model ${model} error: ${err.message}, trying next…`);
       }
-    } catch (err) {
-      if (!errors.some(e => e.startsWith('OpenRouter'))) errors.push(`OpenRouter: ${err.message}`);
-      console.warn('OpenRouter error, trying Groq:', err.message);
     }
+    errors.push('OpenRouter: all models failed');
+    console.warn('OpenRouter all models failed, trying Groq…');
   }
 
   /* ── 3. Groq (Llama 3.3 70B) ─────────────────────────────── */
