@@ -41,7 +41,7 @@ const ROLE_CFG = {
   'AI Solutions Architect':           {color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',icon:'🧠',label:'LLMs, RAG & AI Systems',   short:'AI Architect'},
   'Forward Deployed Engineer':        {color:'#2563EB',bg:'#EFF6FF',border:'#BFDBFE',icon:'⚙️',label:'Embedded Customer Builds', short:'FD Engineer'},
   'Forward Deployed Product Manager': {color:'#D97706',bg:'#FFFBEB',border:'#FDE68A',icon:'📋',label:'Customer-Embedded PM',     short:'FD PM'},
-  'TPM':                              {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'TPM'},
+  'Technical Program Manager':                              {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'Tech PM'},
 };
 
 /* Pick a question not recently shown — cycles through all before repeating */
@@ -62,7 +62,7 @@ const TIPS = {
   'AI Solutions Architect':           "Focus on trade-offs between RAG, fine-tuning, and prompting — not just what you'd build.",
   'Forward Deployed Engineer':        "Start with discovery and observation. Interviewers want your process, not just the solution.",
   'Forward Deployed Product Manager': "Show how you balance one customer's needs against a generalizable product direction.",
-  'TPM':                              "Demonstrate how you create clarity from ambiguity. Name specific artifacts and stakeholders.",
+  'Technical Program Manager':                              "Demonstrate how you create clarity from ambiguity. Name specific artifacts and stakeholders.",
 };
 
 const ScorePill = ({ label, value }) => {

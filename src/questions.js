@@ -1,7 +1,7 @@
 /* Question bank: Industry → Role → { text, mc } */
 
 export const INDUSTRIES = ['General', 'Healthcare', 'Fintech', 'E-commerce'];
-export const ROLES = ['AI Solutions Architect', 'Forward Deployed Engineer', 'Forward Deployed Product Manager', 'TPM'];
+export const ROLES = ['AI Solutions Architect', 'Forward Deployed Engineer', 'Forward Deployed Product Manager', 'Technical Program Manager'];
 
 const mc = (q, options, correct, explanation) => ({ q, options, correct, explanation });
 
@@ -340,8 +340,8 @@ const TPM = {
 };
 
 export const QUESTION_BANK = {
-  'General':     { 'AI Solutions Architect': AISA.General,     'Forward Deployed Engineer': FDE.General,     'Forward Deployed Product Manager': FDPM.General,     'TPM': TPM.General },
-  'Healthcare':  { 'AI Solutions Architect': AISA.Healthcare,  'Forward Deployed Engineer': FDE.Healthcare,  'Forward Deployed Product Manager': FDPM.Healthcare,  'TPM': TPM.Healthcare },
-  'Fintech':     { 'AI Solutions Architect': AISA.Fintech,     'Forward Deployed Engineer': FDE.Fintech,     'Forward Deployed Product Manager': FDPM.Fintech,     'TPM': TPM.Fintech },
-  'E-commerce':  { 'AI Solutions Architect': AISA['E-commerce'],'Forward Deployed Engineer': FDE['E-commerce'],'Forward Deployed Product Manager': FDPM['E-commerce'],'TPM': TPM['E-commerce'] },
+  'General':     { 'AI Solutions Architect': AISA.General,     'Forward Deployed Engineer': FDE.General,     'Forward Deployed Product Manager': FDPM.General,     'Technical Program Manager': TPM.General },
+  'Healthcare':  { 'AI Solutions Architect': AISA.Healthcare,  'Forward Deployed Engineer': FDE.Healthcare,  'Forward Deployed Product Manager': FDPM.Healthcare,  'Technical Program Manager': TPM.Healthcare },
+  'Fintech':     { 'AI Solutions Architect': AISA.Fintech,     'Forward Deployed Engineer': FDE.Fintech,     'Forward Deployed Product Manager': FDPM.Fintech,     'Technical Program Manager': TPM.Fintech },
+  'E-commerce':  { 'AI Solutions Architect': AISA['E-commerce'],'Forward Deployed Engineer': FDE['E-commerce'],'Forward Deployed Product Manager': FDPM['E-commerce'],'Technical Program Manager': TPM['E-commerce'] },
 };
