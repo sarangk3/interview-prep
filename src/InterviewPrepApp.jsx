@@ -42,10 +42,10 @@ const G = () => (
 );
 
 const ROLE_CFG = {
-  'AI Solutions Architect':           {color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',icon:'🧠',label:'LLMs, RAG & AI Systems',   short:'AI Architect'},
-  'Forward Deployed Engineer':        {color:'#2563EB',bg:'#EFF6FF',border:'#BFDBFE',icon:'⚙️',label:'Embedded Customer Builds', short:'FD Engineer'},
-  'Forward Deployed Product Manager': {color:'#D97706',bg:'#FFFBEB',border:'#FDE68A',icon:'📋',label:'Customer-Embedded PM',     short:'FD PM'},
-  'Technical Program Manager':                              {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'Tech PM'},
+  'AI Solutions Architect':           {color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',icon:'🧠',label:'LLMs, RAG & AI Systems',   short:'AI Architect', card:'AI Solutions Architect'},
+  'Forward Deployed Engineer':        {color:'#2563EB',bg:'#EFF6FF',border:'#BFDBFE',icon:'⚙️',label:'Embedded Customer Builds', short:'FD Engineer', card:'FD Engineer'},
+  'Forward Deployed Product Manager': {color:'#D97706',bg:'#FFFBEB',border:'#FDE68A',icon:'📋',label:'Customer-Embedded PM',     short:'FD PM', card:'FD Product Manager'},
+  'Technical Program Manager':                              {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'Tech PM', card:'Tech Program Manager'},
 };
 
 /* Pick a question not recently shown — cycles through all before repeating */
@@ -152,6 +152,8 @@ export default function InterviewPrepApp() {
   const [mockTurnCount,setMockTurnCount] = useState(0);
   const [mockThinking,setMockThinking]   = useState(false);
   const [mockScore,setMockScore]         = useState(null);
+  const [errorMsg,setErrorMsg]           = useState('');
+  const [confirmExit,setConfirmExit]     = useState(false);
   const [openingProblem,setOpeningProblem] = useState(null);
   const [industry,setIndustry]     = useState('General');
   const [role,setRole]             = useState(null);
@@ -191,6 +193,7 @@ export default function InterviewPrepApp() {
     setAllResponses([]);setResponse('');setMcChoice(null);
     setResults(null);setEmailDone(false);setEmailInput('');
     setMockScore(null);setMockTurnCount(0);setMockThinking(false);
+    setErrorMsg('');setConfirmExit(false);
 
     if(format==='mock'){
       const prob=OPENING_PROBLEMS[r]?.[industry]||OPENING_PROBLEMS[r]?.['General'];
@@ -247,7 +250,7 @@ export default function InterviewPrepApp() {
           setPage('results');
         }
       }
-    }catch(err){alert(typeof err==='string'?err:err?.message||'Error. Please try again.');}
+    }catch(err){setErrorMsg(typeof err==='string'?err:(err?.message||'Error. Please try again.'));}
     finally{setMockThinking(false);}
   };
 
@@ -277,7 +280,7 @@ export default function InterviewPrepApp() {
       setAllResponses(next);
       if(qIndex+1<sessionQs.length){setQIndex(qIndex+1);setResponse('');}
       else finishInterview(next,'text');
-    }catch(err){alert((typeof err==='string'?err:err?.message)||'Error. Try Multiple Choice mode which works offline.');}
+    }catch(err){setErrorMsg((typeof err==='string'?err:err?.message)||'Error getting feedback. Try Multiple Choice mode which works offline.');}
     finally{setSubmitting(false);}
   };
 
@@ -336,6 +339,29 @@ export default function InterviewPrepApp() {
   return (
     <>
       <G/>
+      {/* ── Inline error banner ── */}
+      {errorMsg && (
+        <div style={{position:'fixed',top:0,left:0,right:0,zIndex:1000,background:'#FEF2F2',borderBottom:'1px solid #FECACA',padding:'12px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:16}}>⚠️</span>
+            <p style={{fontSize:14,color:'#991B1B',fontWeight:500}}>{errorMsg}</p>
+          </div>
+          <button onClick={()=>setErrorMsg('')} style={{background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:18,lineHeight:1,padding:'0 4px'}}>✕</button>
+        </div>
+      )}
+      {/* ── Exit confirmation modal ── */}
+      {confirmExit && (
+        <div style={{position:'fixed',inset:0,zIndex:999,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+          <div style={{background:'#fff',borderRadius:16,padding:32,maxWidth:380,width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+            <p style={{fontSize:18,fontWeight:700,color:'#111827',marginBottom:8}}>Leave this interview?</p>
+            <p style={{fontSize:14,color:'#6B7280',marginBottom:24,lineHeight:1.6}}>Your progress will be lost and this session won't be saved.</p>
+            <div style={{display:'flex',gap:10}}>
+              <button className="bg" onClick={()=>setConfirmExit(false)} style={{flex:1,padding:'11px',fontSize:14}}>Keep going</button>
+              <button className="bp" onClick={()=>{setConfirmExit(false);setPage('home');setMockMessages([]);setResponse('');}} style={{flex:1,padding:'11px',fontSize:14,background:'#DC2626'}}>Leave</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
         <Sidebar page={page} setPage={setPage} interviews={interviews}/>
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -490,7 +516,7 @@ export default function InterviewPrepApp() {
                       style={{width:'100%',padding:'13px',fontSize:15,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
                       {submitting?(<><span className="spinner"/>Analyzing…</>):isLast?'Finish Interview →':'Next Question →'}
                     </button>
-                    <button className="bg" onClick={()=>setPage('home')} style={{marginTop:8,width:'100%',padding:'11px',fontSize:14}}>Cancel</button>
+                    <button className="bg" onClick={()=>setConfirmExit(true)} style={{marginTop:8,width:'100%',padding:'11px',fontSize:14}}>Cancel</button>
                   </>
                 )}
               </div>
@@ -571,7 +597,7 @@ export default function InterviewPrepApp() {
                               <div style={{width:36,height:36,borderRadius:8,background:c.bg,border:`1px solid ${c.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>{c.icon}</div>
                               <span style={{fontSize:11,color:'#9CA3AF',background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:20,padding:'3px 10px'}}>{format==='mock'?`${MOCK_TURNS[difficulty]||5} rounds`:'5 Qs'}</span>
                             </div>
-                            <p style={{fontWeight:600,fontSize:14,color:'#111827',marginBottom:4}}>{r}</p>
+                            <p style={{fontWeight:600,fontSize:14,color:'#111827',marginBottom:4}}>{c.card||r}</p>
                             {prob?<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14,lineHeight:1.4}}>{prob.title}</p>:<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14}}>{c.label}</p>}
                             <span style={{fontSize:12,color:'#6366F1',fontWeight:600}}>Start →</span>
                           </div>
@@ -866,14 +892,21 @@ export default function InterviewPrepApp() {
                 const maxC=st?Math.max(...Object.values(st.byRole),1):1;
                 return (
                   <div className="mp" style={{maxWidth:820,margin:'0 auto',padding:'36px 32px'}}>
-                    <div className="fu" style={{marginBottom:28}}>
-                      <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:6}}>Your Progress</h1>
-                      <p style={{color:'#6B7280',fontSize:15}}>Track your improvement across roles and sessions.</p>
+                    <div className="fu" style={{marginBottom:28,display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16}}>
+                      <div>
+                        <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:6}}>Your Progress</h1>
+                        <p style={{color:'#6B7280',fontSize:15}}>Track your improvement across roles and sessions.</p>
+                      </div>
+                      {interviews.length>0&&(
+                        <button className="bg" onClick={()=>{if(window.confirm('Clear all session history? This cannot be undone.')){setInterviews([]);persist([],savedEmail);}}} style={{padding:'8px 14px',fontSize:13,color:'#DC2626',borderColor:'#FECACA',flexShrink:0,marginTop:4}}>Clear history</button>
+                      )}
                     </div>
                     {!st?(
-                      <div style={{textAlign:'center',padding:'80px 0'}}>
-                        <p style={{fontSize:40,marginBottom:12}}>📭</p>
-                        <p style={{color:'#9CA3AF',marginBottom:20}}>No sessions yet. Start practicing!</p>
+                      <div style={{textAlign:'center',padding:'60px 0'}}>
+                        <p style={{fontSize:40,marginBottom:16}}>📈</p>
+                        <p style={{fontSize:18,fontWeight:600,color:'#374151',marginBottom:8}}>No sessions yet</p>
+                        <p style={{color:'#9CA3AF',marginBottom:8,fontSize:14}}>Complete your first interview to start tracking your progress.</p>
+                        <p style={{color:'#D1D5DB',marginBottom:24,fontSize:13}}>You'll see your score trends, practice breakdown by role, and session history here.</p>
                         <button className="bp" onClick={()=>setPage('home')} style={{padding:'12px 28px',fontSize:15}}>Start Practicing</button>
                       </div>
                     ):(
