@@ -663,8 +663,9 @@ export default function InterviewPrepApp() {
                     </div>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8,marginBottom:12}}>
                       <span style={{fontSize:12,color:wc>50?'#9CA3AF':'#D1D5DB'}}>{wc} words{wc>0&&wc<50?' — try to elaborate':''}</span>
+                      {wc===0&&<span style={{fontSize:12,color:'#D1D5DB'}}>Type your answer to continue</span>}
                     </div>
-                    <button className="bp" onClick={submitText} disabled={submitting||response.trim().length<10}
+                    <button className="bp" onClick={submitText} disabled={submitting||response.trim().length<3}
                       style={{width:'100%',padding:'13px',fontSize:15,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
                       {submitting?(<><span className="spinner"/>Analyzing…</>):isLast?'Finish Interview →':'Next Question →'}
                     </button>
