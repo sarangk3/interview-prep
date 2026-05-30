@@ -180,7 +180,8 @@ export default function InterviewPrepApp() {
   const [upgradeWorking,setUpgradeWorking] = useState(false);
   const [interviews,setInterviews] = useState([]);
   const [format,setFormat]         = useState('text');
-  const [company,setCompany]       = useState('Anthropic'); // replaces difficulty for mock
+  const [company,setCompany]       = useState('Anthropic');
+  const [selectedRole,setSelectedRole] = useState(null);
   const [mockMessages,setMockMessages]   = useState([]);
   const [mockTurnCount,setMockTurnCount] = useState(0);
   const [mockThinking,setMockThinking]   = useState(false);
@@ -297,7 +298,7 @@ export default function InterviewPrepApp() {
     setAuthWorking(false);
   };
 
-  const handleLogout = async () => { await supabase.auth.signOut(); setInterviews([]); };
+  const handleLogout = async () => { await supabase.auth.signOut(); setInterviews([]); setSelectedRole(null); };
 
   const handleForgotPassword = async () => {
     if(!authEmail.trim()) return setAuthError('Enter your email address first.');
@@ -909,7 +910,6 @@ export default function InterviewPrepApp() {
                   },
                 ];
 
-                const [selectedRole, setSelectedRole] = React.useState(null);
                 const selected = selectedRole ? ROLE_ARTICLES.find(r => r.key === selectedRole) : null;
 
                 return (
