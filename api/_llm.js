@@ -15,7 +15,7 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
   if (claudeKey) {
     try {
       const body = {
-        model:      'claude-haiku-4-5-20251001',
+        model:      'claude-3-5-haiku-20241022',
         max_tokens: maxTokens,
         messages:   userMessages.map(m => ({
           role:    m.role === 'model' ? 'assistant' : m.role,
