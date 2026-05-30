@@ -125,7 +125,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
       </div>
       <div style={{padding:'14px 0',flex:1}}>
         <p style={{fontSize:11,fontWeight:600,color:'#9CA3AF',padding:'0 12px',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>Practice</p>
-        {[{id:'home',label:'Question Bank',icon:'📚'},{id:'dashboard',label:'My Progress',icon:'📈'}].map(item=>(
+        {[{id:'home',label:'Question Bank',icon:'📚'},{id:'dashboard',label:'My Progress',icon:'📈'},{id:'roles',label:'Role Guides',icon:'📖'}].map(item=>(
           <button key={item.id} className={`ni ${page===item.id?'on':''}`} onClick={()=>setPage(item.id)}>
             <span style={{fontSize:16}}>{item.icon}</span>{item.label}
           </button>
@@ -800,7 +800,218 @@ export default function InterviewPrepApp() {
           {page!=='interview' && page!=='signin' && (
             <div style={{flex:1,overflowY:'auto'}}>
 
-              {/* ── RESULTS GATE (anonymous user completed an interview) ── */}
+              {/* ── ROLES GUIDE ── */}
+              {page==='roles' && (()=>{
+                const ROLE_ARTICLES = [
+                  {
+                    key: 'AI Solutions Architect',
+                    cfg: ROLE_CFG['AI Solutions Architect'],
+                    what: "An AI Solutions Architect designs the technical blueprint for how AI systems get built and deployed — typically for enterprise customers or within large organizations. They sit at the intersection of business problems and technical implementation, translating a customer's needs into a concrete, scalable AI architecture.",
+                    notJust: "This is not a pure engineering role — you won't be writing production code all day. And it's not pure consulting — you need deep enough technical knowledge to defend architectural decisions with engineers. It's the role that bridges the gap between 'we want AI to do X' and 'here is exactly how we build that.'",
+                    dayToDay: [
+                      "Running discovery workshops with customers to understand their data, infrastructure, and goals",
+                      "Designing RAG pipelines, fine-tuning strategies, or agent architectures depending on the use case",
+                      "Evaluating model options (GPT-4o, Claude, Llama) and recommending the right fit",
+                      "Creating technical proposals and architecture diagrams for stakeholder review",
+                      "Advising on data preparation, vector stores, embedding strategies, and retrieval quality",
+                      "Defining evaluation frameworks so teams can measure whether the AI is actually working",
+                      "Working with FDEs during build to ensure the architecture is being implemented correctly",
+                    ],
+                    skills: [
+                      { name: 'LLMs & Generative AI', desc: 'Deep understanding of how large language models work, their limitations, and when to use RAG vs fine-tuning vs prompting' },
+                      { name: 'System Design', desc: 'Ability to design scalable, production-grade AI systems — not just prototypes' },
+                      { name: 'Cloud Architecture', desc: 'Proficiency with AWS, GCP, or Azure and how to deploy AI workloads at scale' },
+                      { name: 'Data Engineering', desc: 'Understanding of data pipelines, vector databases (Pinecone, pgvector), and embedding strategies' },
+                      { name: 'Customer Communication', desc: 'Ability to explain complex technical decisions to non-technical stakeholders clearly' },
+                      { name: 'Python & APIs', desc: 'Enough coding ability to prototype and validate architectural decisions' },
+                    ],
+                    teamDynamic: "On a typical engagement, the AI Solutions Architect owns the 'what and why' while the Forward Deployed Engineer owns the 'how and when.' The SA sets the architecture in week 1-2, hands off a detailed technical spec to the FDE, and then shifts to advisory mode — unblocking technical decisions, reviewing implementation, and communicating progress to senior stakeholders. The FDPM runs the customer relationship and scope management. The TPM coordinates across teams if the engagement is complex enough to require one.",
+                    careerPath: "Most AI SAs come from one of three backgrounds: senior ML engineers who developed customer-facing skills, cloud architects who moved into AI, or consultants who went deep on technical knowledge. The role pays well ($180-300K+ at leading AI companies) because the combination of technical depth and customer fluency is rare.",
+                    companiesHiring: ['Anthropic', 'OpenAI', 'Google', 'Microsoft', 'AWS', 'Databricks', 'Scale AI'],
+                  },
+                  {
+                    key: 'Forward Deployed Engineer',
+                    cfg: ROLE_CFG['Forward Deployed Engineer'],
+                    what: "A Forward Deployed Engineer (FDE) is a software engineer who works directly embedded with customers — usually on-site or in deep collaboration — to build, customize, and deploy software for that specific customer's environment. The 'forward deployed' framing comes from the military concept of being deployed at the front lines rather than in a support role back at headquarters.",
+                    notJust: "This is not a typical product engineer building features for millions of anonymous users. Every line of code you write has a specific customer's name on it. You're solving real operational problems with real constraints — legacy systems, skeptical IT teams, tight timelines — not building in a controlled environment with clean APIs.",
+                    dayToDay: [
+                      "Embedding with a customer team for days or weeks at a time to understand their workflows",
+                      "Rapid prototyping — building working demos in days, not months",
+                      "Integrating AI tools with legacy systems (often with incomplete or messy APIs)",
+                      "Debugging in the customer's environment, not your own controlled development setup",
+                      "Running technical discovery: mapping existing systems, data sources, and integration points",
+                      "Writing integration code, building dashboards, creating custom tooling",
+                      "Translating customer feedback into technical requirements for the broader product team",
+                    ],
+                    skills: [
+                      { name: 'Full-Stack Engineering', desc: 'Ability to build end-to-end — frontend, backend, APIs, databases — without needing specialists for each layer' },
+                      { name: 'Rapid Prototyping', desc: 'Comfort building rough-but-working solutions fast. A working demo in 2 days beats a perfect spec in 2 weeks' },
+                      { name: 'API Integration', desc: 'Experience connecting disparate systems — REST, GraphQL, webhooks, legacy SOAP — often with incomplete documentation' },
+                      { name: 'Debugging in Hostile Environments', desc: 'Ability to diagnose problems in systems you didn\'t build, often without access to logs or source code' },
+                      { name: 'Customer Communication', desc: 'Engineers in this role talk to customers every day. You need to explain technical trade-offs in plain language' },
+                      { name: 'Adaptability', desc: 'Every customer engagement is different. You\'re switching contexts, stacks, and problems frequently' },
+                    ],
+                    teamDynamic: "The FDE is the execution engine of a customer engagement. They receive architectural direction from the AI Solutions Architect, scope and requirements from the FDPM, and delivery coordination from the TPM. In smaller engagements, one FDE might cover all of these roles simultaneously — which is why FDEs at top AI companies are generalists by necessity. The role requires enough customer empathy to know when to ask for scope changes and enough engineering depth to push back on technically infeasible requests.",
+                    careerPath: "FDEs typically come from strong software engineering backgrounds, often with startup experience where they built across the full stack under time pressure. The role is a launching pad — many FDEs move into Solutions Architect, Engineering Manager, or even Founding Engineer roles at startups after building the customer-facing pattern recognition this role develops.",
+                    companiesHiring: ['Palantir', 'Anthropic', 'OpenAI', 'Scale AI', 'Glean', 'Anduril', 'Hex'],
+                  },
+                  {
+                    key: 'Forward Deployed Product Manager',
+                    cfg: ROLE_CFG['Forward Deployed Product Manager'],
+                    what: "A Forward Deployed Product Manager (FDPM) is a PM who is embedded with specific customers rather than managing a product roadmap for a broad market. Where a traditional PM might define features for 10,000 customers they've never met, an FDPM is in the room with one customer's leadership team every week, translating their specific operational needs into requirements the engineering team can build.",
+                    notJust: "This is not a traditional product management role. You won't be running A/B tests, managing a feature backlog, or doing broad user research. The job is closer to management consulting meets product management — you're diagnosing a specific customer's problem, scoping what can actually be built, and managing the relationship while the team builds it.",
+                    dayToDay: [
+                      "Running stakeholder interviews to understand the customer's real pain points (not what they say they want, but what they actually need)",
+                      "Writing detailed product requirements that bridge business needs and technical constraints",
+                      "Managing scope — saying no to requests that would blow up the timeline or don't serve the core goal",
+                      "Running weekly status meetings with the customer, translating technical progress into business language",
+                      "Escalating when customer expectations diverge from what's being built",
+                      "Identifying when a customer's specific need should become a general product feature",
+                      "Managing the tension between one customer's requests and the product's broader direction",
+                    ],
+                    skills: [
+                      { name: 'Stakeholder Management', desc: 'Managing expectations across multiple levels — executive sponsors, day-to-day users, IT teams — each with different concerns' },
+                      { name: 'Product Sense', desc: 'Ability to distinguish between what a customer asks for and what they actually need' },
+                      { name: 'Technical Fluency', desc: 'Not a coder, but deep enough to know what\'s technically feasible and to call out when engineers are over-complicating things' },
+                      { name: 'Scope Management', desc: 'The hardest skill in this role: protecting the team from scope creep while keeping the customer happy' },
+                      { name: 'Written Communication', desc: 'PRDs, status updates, escalations — this role produces a high volume of precise written communication' },
+                      { name: 'Consulting Instincts', desc: 'Ability to walk into a new organization, quickly understand how decisions get made, and find the right path through' },
+                    ],
+                    teamDynamic: "The FDPM owns the customer relationship and the scope. They are the primary point of contact for the customer's business stakeholders, while the FDE handles the technical relationship with the customer's engineering team. The SA provides technical credibility when architectural decisions need to be defended. When these roles work well together, the customer feels like they have a cohesive team; when they work poorly, the customer gets inconsistent messages and scope balloons.",
+                    careerPath: "FDPMs often come from consulting (McKinsey, BCG, Bain), traditional PM roles at SaaS companies, or technical backgrounds who moved into product. It's a high-leverage role — a great FDPM can turn a troubled customer relationship into a reference account. Many move into Director of Product, Head of Customer Success, or startup founding roles.",
+                    companiesHiring: ['Palantir', 'Anthropic', 'OpenAI', 'Glean', 'Scale AI', 'Cohere', 'Writer'],
+                  },
+                  {
+                    key: 'Technical Program Manager',
+                    cfg: ROLE_CFG['Technical Program Manager'],
+                    what: "A Technical Program Manager (TPM) drives complex technical initiatives from ambiguity to completion — coordinating across multiple engineering teams, managing dependencies, surfacing risks before they become crises, and creating the organizational clarity that allows technical work to move fast. The 'technical' modifier matters: a TPM needs enough depth to understand what engineers are building and why it's hard.",
+                    notJust: "This is not a project manager who tracks tasks in Jira. And it's not a people manager who owns engineering headcount. A TPM is an independent force multiplier — they don't own the code or the team, but they own the outcome of a program that no single team could deliver alone.",
+                    dayToDay: [
+                      "Building and maintaining the program's dependency map — understanding how 8 teams' work connects",
+                      "Running weekly cross-team syncs focused on blockers, not status updates",
+                      "Writing the one source of truth for program status that replaces 5 competing spreadsheets",
+                      "Identifying risks 4 weeks before they become crises and driving mitigations",
+                      "Facilitating the hard conversations between teams that would otherwise fester for months",
+                      "Communicating program health to executives — concisely, accurately, without spin",
+                      "Defining the go/no-go criteria for launches and holding teams accountable to them",
+                    ],
+                    skills: [
+                      { name: 'Technical Depth', desc: 'Enough engineering background to understand why something is hard, when a timeline is realistic, and when an engineer is underestimating complexity' },
+                      { name: 'Dependency Mapping', desc: 'Ability to model complex multi-team programs and find the critical path others have missed' },
+                      { name: 'Structured Communication', desc: 'Writing crisp status updates, escalation memos, and program plans that busy executives actually read' },
+                      { name: 'Risk Management', desc: 'Proactively identifying what can go wrong and driving mitigations before problems materialize' },
+                      { name: 'Influence Without Authority', desc: 'Getting engineers, EMs, and PMs who don\'t report to you to prioritize your program\'s needs' },
+                      { name: 'Ambiguity Tolerance', desc: 'Comfortable driving forward when requirements are unclear, while creating enough structure for teams to execute' },
+                    ],
+                    teamDynamic: "In an AI deployment context, the TPM typically coordinates across the SA, FDE, FDPM, and the customer's internal teams. They own the program plan, the risk register, and the escalation path. While the SA, FDE, and FDPM each have a specific domain, the TPM's domain is the whole — the interdependencies, the timeline, and the decision-making process. A great TPM makes every other role on the team more effective by removing coordination overhead.",
+                    careerPath: "TPMs typically come from software engineering, product management, or technical consulting backgrounds. The role is one of the highest-leverage positions at large tech companies — a great TPM on a $100M program creates far more value than their compensation. Senior TPMs often move into engineering leadership, VP of Engineering, or Chief of Staff roles.",
+                    companiesHiring: ['Google', 'Amazon', 'Microsoft', 'Meta', 'Apple', 'Stripe', 'Anthropic'],
+                  },
+                ];
+
+                const [selectedRole, setSelectedRole] = React.useState(null);
+                const selected = selectedRole ? ROLE_ARTICLES.find(r => r.key === selectedRole) : null;
+
+                return (
+                  <div className="mp" style={{maxWidth:820,margin:'0 auto',padding:'36px 32px'}}>
+                    {!selected ? (
+                      <>
+                        <div className="fu" style={{marginBottom:28}}>
+                          <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:6}}>Role Guides</h1>
+                          <p style={{color:'#6B7280',fontSize:15}}>Detailed breakdowns of each AI-era tech role — what they do, what skills they need, and how they work together.</p>
+                        </div>
+                        <div className="rg" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:16}}>
+                          {ROLE_ARTICLES.map(r=>(
+                            <div key={r.key} className="rc" onClick={()=>setSelectedRole(r.key)} style={{padding:'24px'}}>
+                              <div style={{display:'flex',alignItems:'flex-start',gap:14,marginBottom:14}}>
+                                <div style={{width:44,height:44,borderRadius:10,background:r.cfg.bg,border:`1px solid ${r.cfg.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>{r.cfg.icon}</div>
+                                <div>
+                                  <p style={{fontWeight:700,fontSize:15,color:'#111827',marginBottom:3}}>{r.key}</p>
+                                  <p style={{fontSize:12,color:r.cfg.color,fontWeight:600}}>{r.cfg.label}</p>
+                                </div>
+                              </div>
+                              <p style={{fontSize:13,color:'#6B7280',lineHeight:1.6,marginBottom:14}}>{r.what.substring(0,140)}…</p>
+                              <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
+                                {r.companiesHiring.slice(0,4).map(c=>(
+                                  <span key={c} style={{fontSize:11,background:'#F3F4F6',color:'#6B7280',padding:'2px 8px',borderRadius:10}}>{c}</span>
+                                ))}
+                              </div>
+                              <span style={{fontSize:13,color:'#6366F1',fontWeight:600}}>Read the guide →</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <button className="bg" onClick={()=>setSelectedRole(null)} style={{padding:'5px 12px',fontSize:13,marginBottom:20}}>← All Roles</button>
+                        {/* Hero */}
+                        <div style={{display:'flex',alignItems:'flex-start',gap:16,marginBottom:28}}>
+                          <div style={{width:56,height:56,borderRadius:14,background:selected.cfg.bg,border:`1px solid ${selected.cfg.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,flexShrink:0}}>{selected.cfg.icon}</div>
+                          <div>
+                            <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:4}}>{selected.key}</h1>
+                            <p style={{fontSize:14,color:selected.cfg.color,fontWeight:600}}>{selected.cfg.label}</p>
+                          </div>
+                        </div>
+                        {/* What is this role */}
+                        <div className="card fu" style={{padding:'24px',marginBottom:16}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>What is this role?</p>
+                          <p style={{fontSize:14,color:'#374151',lineHeight:1.8}}>{selected.what}</p>
+                        </div>
+                        {/* Not just */}
+                        <div className="card fu" style={{padding:'24px',marginBottom:16,background:'#FFFBEB',border:'1px solid #FDE68A'}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#B45309',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>What it is NOT</p>
+                          <p style={{fontSize:14,color:'#78350F',lineHeight:1.8}}>{selected.notJust}</p>
+                        </div>
+                        {/* Day to day */}
+                        <div className="card fu" style={{padding:'24px',marginBottom:16}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Day-to-day responsibilities</p>
+                          {selected.dayToDay.map((item,i)=>(
+                            <div key={i} style={{display:'flex',gap:10,marginBottom:10}}>
+                              <div style={{width:6,height:6,borderRadius:'50%',background:selected.cfg.color,flexShrink:0,marginTop:6}}/>
+                              <p style={{fontSize:14,color:'#374151',lineHeight:1.7}}>{item}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Skills */}
+                        <div className="card fu" style={{padding:'24px',marginBottom:16}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Key skills required</p>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                            {selected.skills.map((skill,i)=>(
+                              <div key={i} style={{background:'#F9FAFB',borderRadius:10,padding:'14px 16px',border:'1px solid #F3F4F6'}}>
+                                <p style={{fontSize:13,fontWeight:600,color:selected.cfg.color,marginBottom:5}}>{skill.name}</p>
+                                <p style={{fontSize:12,color:'#6B7280',lineHeight:1.5}}>{skill.desc}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Team dynamic */}
+                        <div className="card fu" style={{padding:'24px',marginBottom:16,background:'#EFF6FF',border:'1px solid #BFDBFE'}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#1D4ED8',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>How this role works with the team</p>
+                          <p style={{fontSize:14,color:'#1E40AF',lineHeight:1.8}}>{selected.teamDynamic}</p>
+                        </div>
+                        {/* Career path */}
+                        <div className="card fu" style={{padding:'24px',marginBottom:16}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Career path</p>
+                          <p style={{fontSize:14,color:'#374151',lineHeight:1.8}}>{selected.careerPath}</p>
+                        </div>
+                        {/* Companies hiring */}
+                        <div className="card fu" style={{padding:'24px',marginBottom:24}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Companies hiring this role</p>
+                          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                            {selected.companiesHiring.map(c=>(
+                              <span key={c} style={{fontSize:13,fontWeight:500,background:selected.cfg.bg,color:selected.cfg.color,border:`1px solid ${selected.cfg.border}`,padding:'5px 14px',borderRadius:20}}>{c}</span>
+                            ))}
+                          </div>
+                        </div>
+                        {/* CTA */}
+                        <button className="bp" onClick={()=>{setSelectedRole(null);setPage('home');}} style={{padding:'13px 28px',fontSize:15}}>
+                          Practice {selected.key} interviews →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {page==='results-gate' && pendingInterview && (
                 <div style={{maxWidth:480,margin:'0 auto',padding:'48px 24px'}}>
                   {/* Score teaser */}
