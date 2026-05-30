@@ -8,16 +8,17 @@
  */
 
 const GEMINI_URL = model =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+  `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
 const GROQ_URL       = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Primary free model, fallback if it errors
+// Currently active free models on OpenRouter (updated May 2026)
 const OPENROUTER_MODELS = [
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
-  'google/gemma-3-27b-it:free',
+  'deepseek/deepseek-chat-v3-0324:free',
+  'meta-llama/llama-4-scout:free',
+  'qwen/qwen3-8b:free',
+  'google/gemma-3-12b-it:free',
 ];
 
 /**
@@ -42,7 +43,7 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
       const body = { contents, generationConfig: { temperature, maxOutputTokens: maxTokens } };
       if (system) body.system_instruction = { parts: [{ text: system }] };
 
-      const res  = await fetch(GEMINI_URL('gemini-1.5-flash'), {
+      const res  = await fetch(GEMINI_URL('gemini-1.5-flash-latest'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const data = await res.json();
