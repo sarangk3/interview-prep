@@ -43,10 +43,10 @@ const G = () => (
 );
 
 const ROLE_CFG = {
-  'AI Solutions Architect':           {color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',icon:'',label:'LLMs, RAG & AI Systems',   short:'AI Architect', card:'AI Solutions Architect'},
+  'AI Solutions Architect':           {color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',icon:'🧠',label:'LLMs, RAG & AI Systems',   short:'AI Architect', card:'AI Solutions Architect'},
   'Forward Deployed Engineer':        {color:'#2563EB',bg:'#EFF6FF',border:'#BFDBFE',icon:'️',label:'Embedded Customer Builds', short:'FD Engineer', card:'FD Engineer'},
-  'Forward Deployed Product Manager': {color:'#D97706',bg:'#FFFBEB',border:'#FDE68A',icon:'',label:'Customer-Embedded PM',     short:'FD PM', card:'FD Product Manager'},
-  'Technical Program Manager':                              {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'',label:'Programs & Delivery',      short:'Tech PM', card:'Tech Program Manager'},
+  'Forward Deployed Product Manager': {color:'#D97706',bg:'#FFFBEB',border:'#FDE68A',icon:'📋',label:'Customer-Embedded PM',     short:'FD PM', card:'FD Product Manager'},
+  'Technical Program Manager':                              {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'Tech PM', card:'Tech Program Manager'},
 };
 
 /* Pick a question not recently shown, cycles through all before repeating */
@@ -1123,13 +1123,14 @@ export default function InterviewPrepApp() {
                         const c=ROLE_CFG[r];
                         const prob=format==='mock'?(OPENING_PROBLEMS[r]?.[industry]||OPENING_PROBLEMS[r]?.['General']):null;
                         return (
-                          <div key={r} className="rc" onClick={()=>startInterview(r,'full')} style={{borderLeft:`3px solid ${c.color}`}}>
-                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                              <p style={{fontWeight:600,fontSize:14,color:'#111827'}}>{c.card||r}</p>
-                              <span style={{fontSize:11,color:'#9CA3AF',background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:20,padding:'3px 10px',flexShrink:0}}>{format==='mock'?`${MOCK_TURNS} rounds`:'5 Qs'}</span>
+                          <div key={r} className="rc" onClick={()=>startInterview(r,'full')}>
+                            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:12}}>
+                              <div style={{width:36,height:36,borderRadius:8,background:c.bg,border:`1px solid ${c.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>{c.icon}</div>
+                              <span style={{fontSize:11,color:'#9CA3AF',background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:20,padding:'3px 10px'}}>{format==='mock'?`${MOCK_TURNS} rounds`:'5 Qs'}</span>
                             </div>
+                            <p style={{fontWeight:600,fontSize:14,color:'#111827',marginBottom:4}}>{c.card||r}</p>
                             {prob?<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14,lineHeight:1.4}}>{prob.title}</p>:<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14}}>{c.label}</p>}
-                            <span style={{fontSize:12,color:c.color,fontWeight:600}}>Start →</span>
+                            <span style={{fontSize:12,color:'#6366F1',fontWeight:600}}>Start →</span>
                           </div>
                         );
                       })}
@@ -1146,9 +1147,12 @@ export default function InterviewPrepApp() {
                       {ROLES.map(r=>{
                         const c=ROLE_CFG[r];
                         return (
-                          <div key={r} className="rc" onClick={()=>startInterview(r,'deep')} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderLeft:`3px solid ${c.color}`}}>
-                            <p style={{fontSize:13,fontWeight:600,color:'#374151'}}>{c.short}</p>
-                            <span style={{color:'#D1D5DB',fontSize:16}}>›</span>
+                          <div key={r} className="rc" onClick={()=>startInterview(r,'deep')} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px'}}>
+                            <div>
+                              <div style={{width:6,height:6,borderRadius:'50%',background:c.color,marginBottom:8}}/>
+                              <p style={{fontSize:13,fontWeight:600,color:'#374151'}}>{c.short}</p>
+                            </div>
+                            <span style={{color:'#D1D5DB',fontSize:18}}>›</span>
                           </div>
                         );
                       })}
