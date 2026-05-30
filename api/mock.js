@@ -10,6 +10,36 @@ const DIFFICULTY_CONFIG = {
 export default async function handler(req, res) {
   if (req.method!=='POST') return res.status(405).json({error:'Method not allowed.'});
 
+  const authHeader = req.headers.authorization;
+  let isPro = false;
+
+  // Check auth and pro status
+  if (authHeader?.startsWith('Bearer ') && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const sb = createClient(process.env.VITE_SUPABASE_URL||process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {auth:{autoRefreshToken:false,persistSession:false}});
+      const { data:{ user } } = await sb.auth.getUser(authHeader.replace('Bearer ',''));
+      if (user) {
+        const { data: prof } = await sb.from('profiles').select('is_pro,pro_expires_at,mocks_completed').eq('id', user.id).single();
+        isPro = prof?.is_pro && (!prof?.pro_expires_at || new Date(prof.pro_expires_at) > new Date());
+
+        // Rate limit mock turns (not score requests — those are fast)
+        if (req.body.mode !== 'score') {
+          const today = new Date().toISOString().split('T')[0];
+          const { data:usage } = await sb.from('daily_usage').select('ai_answers').eq('user_id',user.id).eq('date',today).single();
+          const count = usage?.ai_answers||0;
+          const limit = isPro ? 999 : 20;
+          if (count >= limit) return res.status(429).json({ error:"You've used all your free AI answers for today. Upgrade to Pro for unlimited." });
+          await sb.from('daily_usage').upsert({user_id:user.id,date:today,ai_answers:count+1},{onConflict:'user_id,date'});
+        }
+
+        // On final scoring, increment mocks_completed for free users
+        if (req.body.mode === 'score' && !isPro) {
+          await sb.from('profiles').upsert({ id: user.id, mocks_completed: (prof?.mocks_completed||0)+1 }, { onConflict:'id' });
+        }
+      }
+    } catch(e) { console.warn('Mock auth check:', e.message); }
+  }
+
   const {
     mode, messages, role, industry, difficulty='medium',
     turn, maxTurns, openingProblem, keyComponents, hints

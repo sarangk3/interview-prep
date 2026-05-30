@@ -84,7 +84,8 @@ const ScorePill = ({ label, value }) => {
 
 const TrendChart = ({ data }) => {
   const W=580,H=180,pL=30,pR=12,pT=12,pB=24,pw=W-pL-pR,ph=H-pT-pB,n=data.length;
-  const x=i=>n===1?pL+pw/2:pL+(i*pw)/(n-1), y=s=>pT+ph-(s/10)*ph;
+  const x = (i) => n===1 ? pL + (pw/2) : pL + ((i*pw) / (n-1));
+  const y = (s) => pT + ph - ((s/10) * ph);
   const line=data.map((d,i)=>`${i===0?'M':'L'} ${x(i).toFixed(1)} ${y(d.score).toFixed(1)}`).join(' ');
   const area=`${line} L ${x(n-1).toFixed(1)} ${pT+ph} L ${x(0).toFixed(1)} ${pT+ph} Z`;
   return (
@@ -102,9 +103,9 @@ const TrendChart = ({ data }) => {
 };
 
 /* Sidebar defined OUTSIDE main component — stable reference, never remounts */
-const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn }) => {
+const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, onUpgrade }) => {
   const st=interviews.length;
-  const avg=st?Math.round(interviews.reduce((s,i)=>s+i.score,0)/st):null;
+  const avg = st ? Math.round(interviews.reduce((s,i)=>s+i.score, 0) / st) : null;
   return (
     <div className="sb" style={{width:220,background:'#fff',borderRight:'1px solid #E5E7EB',display:'flex',flexDirection:'column',padding:'0 10px',flexShrink:0}}>
       <div style={{padding:'20px 6px 20px',borderBottom:'1px solid #F3F4F6'}}>
@@ -129,7 +130,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn }) => {
           </div>
           <div style={{display:'flex',justifyContent:'space-between'}}>
             <span style={{fontSize:12,color:'#9CA3AF'}}>Avg score</span>
-            <span style={{fontSize:12,fontWeight:600,color:'#6366F1'}}>{avg}/10</span>
+            <span style={{fontSize:12,fontWeight:600,color:'#6366F1'}}>{avg + '/10'}</span>
           </div>
         </div>
       )}
@@ -141,12 +142,14 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn }) => {
           </div>
         ) : (
           <button onClick={()=>onSignIn()} style={{width:'100%',marginBottom:10,padding:'10px 12px',background:'#EEF2FF',border:'1px solid #C7D2FE',borderRadius:10,cursor:'pointer',fontSize:13,fontWeight:600,color:'#4F46E5',textAlign:'left'}}>
-            Sign in / Create account →
+            Sign in · Create account →
           </button>
         )}
         <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:10,padding:'10px 12px'}}>
-          <p style={{fontSize:12,fontWeight:600,color:'#15803D',marginBottom:2}}>Free Plan</p>
-          <p style={{fontSize:11,color:'#6B7280'}}>Unlimited MC · 20 AI/day</p>
+          <p style={{fontSize:12,fontWeight:600,color:'#15803D',marginBottom:2}}>{user && isPro ? '⚡ Pro' : 'Free Plan'}</p>
+          <p style={{fontSize:11,color:'#6B7280'}}>{user && isPro ? 'Unlimited everything' : 'Unlimited MC · 5 AI per day'}</p>
+          {user && !isPro && <button onClick={onUpgrade} style={{marginTop:6,background:'#6366F1',border:'none',borderRadius:6,color:'#fff',fontSize:11,fontWeight:600,padding:'4px 10px',cursor:'pointer',width:'100%'}}>Upgrade to Pro →</button>}
+        </div>
         </div>
       </div>
     </div>
@@ -157,12 +160,16 @@ export default function InterviewPrepApp() {
   const [page,setPage]             = useState('home');
   const [user,setUser]             = useState(null);
   const [authLoading,setAuthLoading] = useState(true);
-  const [authMode,setAuthMode]     = useState('signup'); // default to signup on results gate
+  const [authMode,setAuthMode]     = useState('signup');
   const [authEmail,setAuthEmail]   = useState('');
   const [authPassword,setAuthPassword] = useState('');
   const [authError,setAuthError]   = useState('');
   const [authWorking,setAuthWorking] = useState(false);
-  const [pendingInterview,setPendingInterview] = useState(null); // holds completed interview for anonymous users
+  const [pendingInterview,setPendingInterview] = useState(null);
+  const [profile,setProfile]       = useState(null); // { is_pro, mocks_completed, pro_expires_at }
+  const [showUpgrade,setShowUpgrade] = useState(false);
+  const [upgradeReason,setUpgradeReason] = useState(''); // 'mock'|'hard'|'answers'
+  const [upgradeWorking,setUpgradeWorking] = useState(false);
   const [interviews,setInterviews] = useState([]);
   const [format,setFormat]         = useState('text');
   const [difficulty,setDifficulty] = useState('medium');
@@ -191,17 +198,45 @@ export default function InterviewPrepApp() {
   const chatEndRef = useRef(null);
   const speechOk = typeof window!=='undefined'&&!!(window.SpeechRecognition||window.webkitSpeechRecognition);
 
+  const loadProfile = async (userId) => {
+    const { data:{ session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch('/api/profile', { headers:{ 'Authorization':`Bearer ${session.access_token}` } });
+      const data = await res.json();
+      if (data.profile) setProfile(data.profile);
+    } catch(e) { console.warn('Profile load error:', e.message); }
+  };
+
   // Supabase auth state + interview loading
   useEffect(()=>{
-    supabase.auth.getSession().then(({ data:{ session } })=>{
+    // Check for Stripe return with session_id
+    const params = new URLSearchParams(window.location.search);
+    const stripeSessionId = params.get('session_id');
+
+    supabase.auth.getSession().then(async({ data:{ session } })=>{
       setUser(session?.user ?? null);
-      if(session?.user) loadInterviews(session.user.id);
+      if(session?.user) {
+        loadInterviews(session.user.id);
+        loadProfile(session.user.id);
+        // Confirm Stripe payment if returning from checkout
+        if(stripeSessionId) {
+          try {
+            const r = await fetch('/api/confirm-upgrade', { method:'POST',
+              headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
+              body: JSON.stringify({ sessionId: stripeSessionId }) });
+            const d = await r.json();
+            if(d.success) { setProfile(p=>({...p, is_pro:true})); }
+          } catch(e) {}
+          window.history.replaceState({}, '', '/'); // clean URL
+        }
+      }
       setAuthLoading(false);
     });
     const { data:{ subscription } } = supabase.auth.onAuthStateChange((_evt, session)=>{
       setUser(session?.user ?? null);
-      if(session?.user) loadInterviews(session.user.id);
-      else { setInterviews([]); setPage('home'); }
+      if(session?.user) { loadInterviews(session.user.id); loadProfile(session.user.id); }
+      else { setInterviews([]); setProfile(null); setPage('home'); }
     });
     return ()=>subscription.unsubscribe();
   },[]);
@@ -270,9 +305,38 @@ export default function InterviewPrepApp() {
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
   const wc=response.trim().split(/\s+/).filter(Boolean).length;
 
+  const isPro = profile?.is_pro && (!profile?.pro_expires_at || new Date(profile.pro_expires_at) > new Date());
+
+  const startUpgrade = async (priceId) => {
+    if (!user) { setPage('signin'); setShowUpgrade(false); return; }
+    setUpgradeWorking(true);
+    try {
+      const { data:{ session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/checkout', { method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`},
+        body: JSON.stringify({ priceId }) });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else setErrorMsg(data.error || 'Could not start checkout. Please try again.');
+    } catch(e) { setErrorMsg('Checkout failed. Please try again.'); }
+    setUpgradeWorking(false);
+  };
+
   const MOCK_TURNS = { easy:3, medium:5, hard:7 };
 
   const startInterview=(r,m)=>{
+    // Gate: AI features require login (cost control)
+    if(!user && (format==='text' || format==='mock')) {
+      setAuthMode('signup'); setAuthError(''); setPage('signin'); return;
+    }
+    // Gate: Hard difficulty requires Pro
+    if(format==='mock' && difficulty==='hard' && !isPro) {
+      setUpgradeReason('hard'); setShowUpgrade(true); return;
+    }
+    // Gate: More than 1 mock interview requires Pro
+    if(format==='mock' && user && !isPro && (profile?.mocks_completed||0) >= 1) {
+      setUpgradeReason('mock'); setShowUpgrade(true); return;
+    }
     setRole(r);setMode(m);
     setAllResponses([]);setResponse('');setMcChoice(null);
     setResults(null);
@@ -485,7 +549,56 @@ export default function InterviewPrepApp() {
           <button onClick={()=>setErrorMsg('')} style={{background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:18,lineHeight:1,padding:'0 4px'}}>✕</button>
         </div>
       )}
-      {/* ── Exit confirmation modal ── */}
+      {/* ── Upgrade modal ── */}
+      {showUpgrade && (
+        <div style={{position:'fixed',inset:0,zIndex:1000,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={()=>setShowUpgrade(false)}>
+          <div style={{background:'#fff',borderRadius:20,padding:36,maxWidth:460,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,0.25)'}} onClick={e=>e.stopPropagation()}>
+            <div style={{textAlign:'center',marginBottom:24}}>
+              <div style={{fontSize:36,marginBottom:12}}>
+                {upgradeReason==='hard'?'🔥':upgradeReason==='mock'?'🎯':'⚡'}
+              </div>
+              <h2 style={{fontSize:20,fontWeight:700,color:'#111827',marginBottom:8}}>
+                {upgradeReason==='hard'?'Hard mode is Pro only':
+                 upgradeReason==='mock'?"You've used your free mock interview":
+                 "You've used your free answers for today"}
+              </h2>
+              <p style={{color:'#6B7280',fontSize:14,lineHeight:1.6}}>
+                {upgradeReason==='hard'?'Hard difficulty runs 7 rounds of rigorous questioning — reserved for Pro members.':
+                 upgradeReason==='mock'?'Upgrade to Pro for unlimited mock interviews with AI-guided feedback.':
+                 'Upgrade to Pro for unlimited AI-scored written answers.'}
+              </p>
+            </div>
+            {/* Pro benefits */}
+            <div style={{background:'#F5F3FF',borderRadius:12,padding:'14px 18px',marginBottom:20}}>
+              {['Unlimited AI-scored written answers','Unlimited mock interviews','Hard difficulty (7 rigorous rounds)','Full session history & score trends'].map((b,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:i<3?8:0}}>
+                  <span style={{color:'#7C3AED',fontWeight:700,flexShrink:0}}>✓</span>
+                  <span style={{fontSize:13,color:'#4C1D95'}}>{b}</span>
+                </div>
+              ))}
+            </div>
+            {/* Pricing options */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+              <button onClick={()=>startUpgrade(process.env.VITE_STRIPE_PRICE_MONTHLY||'price_monthly')} disabled={upgradeWorking}
+                style={{padding:'14px',background:'#6366F1',color:'#fff',border:'none',borderRadius:12,cursor:'pointer',textAlign:'center',opacity:upgradeWorking?0.6:1}}>
+                <div style={{fontSize:18,fontWeight:700}}>$19</div>
+                <div style={{fontSize:11,opacity:0.85}}>per month</div>
+                <div style={{fontSize:11,opacity:0.7,marginTop:2}}>Cancel anytime</div>
+              </button>
+              <button onClick={()=>startUpgrade(process.env.VITE_STRIPE_PRICE_PACK||'price_pack')} disabled={upgradeWorking}
+                style={{padding:'14px',background:'#111827',color:'#fff',border:'none',borderRadius:12,cursor:'pointer',textAlign:'center',position:'relative',opacity:upgradeWorking?0.6:1}}>
+                <div style={{position:'absolute',top:-8,right:-4,background:'#F59E0B',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:10}}>BEST VALUE</div>
+                <div style={{fontSize:18,fontWeight:700}}>$49</div>
+                <div style={{fontSize:11,opacity:0.85}}>30-day pack</div>
+                <div style={{fontSize:11,opacity:0.7,marginTop:2}}>One-time payment</div>
+              </button>
+            </div>
+            <button onClick={()=>setShowUpgrade(false)} style={{width:'100%',background:'none',border:'none',cursor:'pointer',color:'#9CA3AF',fontSize:13,padding:'8px 0'}}>
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
       {confirmExit && (
         <div style={{position:'fixed',inset:0,zIndex:999,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
           <div style={{background:'#fff',borderRadius:16,padding:32,maxWidth:380,width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
@@ -499,7 +612,7 @@ export default function InterviewPrepApp() {
         </div>
       )}
       <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
-        <Sidebar page={page} setPage={setPage} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}}/>
+        <Sidebar page={page} setPage={setPage} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}}/>
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
 
           {/* ── Auth modal (standalone sign in page) ── */}
@@ -720,13 +833,16 @@ export default function InterviewPrepApp() {
                   <div className="fu d1" style={{marginBottom:24}}>
                     <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Answer format</p>
                     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                      {[{id:'text',label:'Written Response',desc:'AI scores your answer in depth'},
-                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline'},
-                        {id:'mock',label:'Mock Interview',    desc:'Dynamic back-and-forth with an AI interviewer'}].map(f=>(
+                      {[{id:'text',label:'Written Response',desc:'AI scores your answer in depth',requiresAuth:true},
+                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline',requiresAuth:false},
+                        {id:'mock',label:'Mock Interview',    desc:'Dynamic back-and-forth with an AI interviewer',requiresAuth:true}].map(f=>(
                         <div key={f.id} onClick={()=>setFormat(f.id)} style={{flex:1,minWidth:180,padding:'14px 16px',borderRadius:10,cursor:'pointer',
                           border:format===f.id?'2px solid #6366F1':'1px solid #E5E7EB',background:format===f.id?'#F5F3FF':'#fff',transition:'all .15s'}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                            <span style={{fontSize:14,fontWeight:600,color:format===f.id?'#4F46E5':'#111827'}}>{f.label}</span>
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                              <span style={{fontSize:14,fontWeight:600,color:format===f.id?'#4F46E5':'#111827'}}>{f.label}</span>
+                              {f.requiresAuth&&!user&&<span style={{fontSize:10,fontWeight:600,color:'#9CA3AF',background:'#F3F4F6',padding:'1px 6px',borderRadius:6}}>Sign in</span>}
+                            </div>
                             {format===f.id&&<div style={{width:16,height:16,borderRadius:'50%',background:'#6366F1',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#fff'}}>✓</div>}
                           </div>
                           <p style={{fontSize:12,color:'#9CA3AF'}}>{f.desc}</p>
@@ -741,10 +857,12 @@ export default function InterviewPrepApp() {
                       <div style={{display:'flex',gap:8}}>
                         {[{id:'easy',label:'Easy',desc:'3 rounds · Supportive'},
                           {id:'medium',label:'Medium',desc:'5 rounds · Challenging'},
-                          {id:'hard',label:'Hard',desc:'7 rounds · Rigorous'}].map(d=>(
-                          <div key={d.id} onClick={()=>setDifficulty(d.id)} style={{flex:1,padding:'12px 14px',borderRadius:10,cursor:'pointer',transition:'all .15s',
+                          {id:'hard',label:'Hard',desc:'7 rounds · Rigorous',proOnly:true}].map(d=>(
+                          <div key={d.id} onClick={()=>setDifficulty(d.id)} style={{flex:1,padding:'12px 14px',borderRadius:10,cursor:'pointer',transition:'all .15s',position:'relative',
                             border:difficulty===d.id?`2px solid ${d.id==='easy'?'#059669':d.id==='medium'?'#D97706':'#DC2626'}`:'1px solid #E5E7EB',
-                            background:difficulty===d.id?`${d.id==='easy'?'#F0FDF4':d.id==='medium'?'#FFFBEB':'#FEF2F2'}`:'#fff'}}>
+                            background:difficulty===d.id?`${d.id==='easy'?'#F0FDF4':d.id==='medium'?'#FFFBEB':'#FEF2F2'}`:'#fff',
+                            opacity:(d.proOnly&&!isPro)?0.7:1}}>
+                            {d.proOnly&&!isPro&&<span style={{position:'absolute',top:6,right:8,fontSize:9,fontWeight:700,color:'#7C3AED',background:'#EDE9FE',padding:'1px 5px',borderRadius:6}}>PRO</span>}
                             <p style={{fontSize:13,fontWeight:600,color:difficulty===d.id?(d.id==='easy'?'#059669':d.id==='medium'?'#D97706':'#DC2626'):'#374151',marginBottom:2}}>{d.label}</p>
                             <p style={{fontSize:11,color:'#9CA3AF'}}>{d.desc}</p>
                           </div>
@@ -1127,7 +1245,7 @@ export default function InterviewPrepApp() {
                                       <p style={{fontSize:12,color:'#9CA3AF',marginTop:1}}>{new Date(s.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · {s.format==='mc'?'MC':'Text'} · {s.mode==='full'?'5 Q':'1 Q'}</p>
                                     </div>
                                   </div>
-                                  <span style={{fontSize:20,fontWeight:700,color:sc}}>{s.score}/10</span>
+                                  <span style={{fontSize:20,fontWeight:700,color:sc}}>{s.score}{'/10'}</span>
                                 </div>
                               );
                             })}
