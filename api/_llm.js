@@ -38,7 +38,7 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
       const body = { contents, generationConfig: { temperature, maxOutputTokens: maxTokens } };
       if (system) body.system_instruction = { parts: [{ text: system }] };
 
-      const res  = await fetch(GEMINI_URL('gemini-2.0-flash'), {
+      const res  = await fetch(GEMINI_URL('gemini-2.0-flash-lite'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       const data = await res.json();
