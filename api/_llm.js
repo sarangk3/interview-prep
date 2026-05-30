@@ -1,14 +1,11 @@
 /**
  * Shared LLM helper.
- * Primary:  Gemini 2.0 Flash via v1beta (free with billing enabled)
- * Fallback: Claude Haiku 4.5 (paid, ~$0.003/call — last resort only)
- * Emergency: Groq Llama 3.3 (free, if both above fail)
- *
- * COST CONTROL: All AI features are gated behind login in the frontend.
- * Anonymous users can only use MC mode (no API calls).
+ * Primary:  Gemini 1.5 Flash via v1beta (free with billing enabled)
+ * Fallback: Groq Llama 3.3 (free, 14,400 req/day)
+ * Last:     Claude Haiku (paid — only when both above fail)
  */
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 const CLAUDE_URL = 'https://api.anthropic.com/v1/messages';
 const GROQ_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -69,55 +66,54 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
     }
   }
 
-  /* ── 2. Claude Haiku (paid fallback — only if Gemini fails) ─── */
+  /* ── 2. Groq (free fallback) ────────────────────────────────── */
+  if (groqKey) {
+    try {
+      const messages = [];
+      if (system) messages.push({ role: 'system', content: system });
+      messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
+
+      const res = await fetch(GROQ_URL, {
+        method:  'POST',
+        headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${groqKey}` },
+        body: JSON.stringify({ model:'llama-3.3-70b-versatile', max_tokens:maxTokens, temperature, messages }),
+      });
+      const data = await res.json();
+      if (res.status === 429 || res.status >= 500) { console.warn('Groq rate limited, trying Claude'); throw new Error('retry'); }
+      if (!res.ok) throw new Error(data?.error?.message || `Groq HTTP ${res.status}`);
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Empty Groq response');
+      console.log('Served by: groq');
+      return { text, provider: 'groq' };
+    } catch (err) {
+      if (err.message !== 'retry') console.warn('Groq error, trying Claude:', err.message);
+    }
+  }
+
+  /* ── 3. Claude Haiku (paid, last resort) ────────────────────── */
   if (claudeKey) {
     try {
       const body = {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: maxTokens,
-        messages: userMessages.map(m => ({
-          role: m.role === 'model' ? 'assistant' : m.role,
-          content: m.content,
-        })),
+        messages: userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })),
       };
       if (system) body.system = system;
-
       const res = await fetch(CLAUDE_URL, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-api-key':claudeKey, 'anthropic-version':'2023-06-01' },
         body: JSON.stringify(body),
       });
       const data = await res.json();
-
-      if (res.status === 429 || res.status >= 500) { console.warn('Claude rate limited, trying Groq'); throw new Error('retry'); }
       if (!res.ok) throw new Error(data?.error?.message || `Claude HTTP ${res.status}`);
-
       const text = data?.content?.[0]?.text;
       if (!text) throw new Error('Empty Claude response');
-      console.log('Served by: claude-haiku (fallback)');
+      console.log('Served by: claude-haiku');
       return { text, provider: 'claude-haiku' };
-
     } catch (err) {
-      if (err.message !== 'retry') console.warn('Claude error, trying Groq:', err.message);
+      console.warn('Claude error:', err.message);
     }
   }
 
-  /* ── 3. Groq (emergency fallback, free) ────────────────────── */
-  if (!groqKey) throw new Error('No AI providers configured.');
-
-  const messages = [];
-  if (system) messages.push({ role: 'system', content: system });
-  messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
-
-  const res = await fetch(GROQ_URL, {
-    method:  'POST',
-    headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${groqKey}` },
-    body: JSON.stringify({ model:'llama-3.3-70b-versatile', max_tokens:maxTokens, temperature, messages }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || 'Groq error');
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error('Empty Groq response');
-  console.log('Served by: groq (emergency fallback)');
-  return { text, provider: 'groq' };
+  throw new Error('All AI providers unavailable. Please try again.');
 }
