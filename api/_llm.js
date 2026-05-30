@@ -46,7 +46,7 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
       if (res.status === 429 || res.status >= 500) {
         const reason = data?.error?.message || res.status;
         errors.push(`Gemini: ${reason}`);
-        console.warn(`Gemini unavailable (${reason}), trying Groq…`);
+        console.warn(`Gemini unavailable (${reason}), trying OpenRouter…`);
       } else if (!res.ok) {
         throw new Error(data?.error?.message || `Gemini HTTP ${res.status}`);
       } else {
@@ -56,43 +56,11 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
       }
     } catch (err) {
       if (!errors.some(e => e.startsWith('Gemini'))) errors.push(`Gemini: ${err.message}`);
-      console.warn('Gemini error, trying Groq:', err.message);
+      console.warn('Gemini error, trying OpenRouter:', err.message);
     }
   }
 
-  /* ── 2. Groq (Llama 3.3 70B) ─────────────────────────────── */
-  if (groqKey) {
-    try {
-      const messages = [];
-      if (system) messages.push({ role: 'system', content: system });
-      messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
-
-      const res  = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: maxTokens, temperature, messages }),
-      });
-      const data = await res.json();
-
-      if (res.status === 429 || res.status >= 500) {
-        const reason = data?.error?.message || res.status;
-        errors.push(`Groq: ${reason}`);
-        console.warn(`Groq unavailable (${reason}), trying OpenRouter…`);
-      } else if (!res.ok) {
-        throw new Error(data?.error?.message || `Groq HTTP ${res.status}`);
-      } else {
-        const text = data?.choices?.[0]?.message?.content;
-        if (!text) throw new Error('Empty Groq response');
-        console.log('Served by: groq');
-        return { text, provider: 'groq' };
-      }
-    } catch (err) {
-      if (!errors.some(e => e.startsWith('Groq'))) errors.push(`Groq: ${err.message}`);
-      console.warn('Groq error, trying OpenRouter:', err.message);
-    }
-  }
-
-  /* ── 3. OpenRouter (free Llama 3.3 70B) ──────────────────── */
+  /* ── 2. OpenRouter (free Llama 3.3 70B) ──────────────────── */
   if (openrouterKey) {
     try {
       const messages = [];
@@ -111,14 +79,46 @@ export async function callLLM({ system, userMessages, temperature = 0.4, maxToke
       });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data?.error?.message || `OpenRouter HTTP ${res.status}`);
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error('Empty OpenRouter response');
-      console.log('Served by: openrouter');
-      return { text, provider: 'openrouter' };
+      if (res.status === 429 || res.status >= 500) {
+        const reason = data?.error?.message || res.status;
+        errors.push(`OpenRouter: ${reason}`);
+        console.warn(`OpenRouter unavailable (${reason}), trying Groq…`);
+      } else if (!res.ok) {
+        throw new Error(data?.error?.message || `OpenRouter HTTP ${res.status}`);
+      } else {
+        const text = data?.choices?.[0]?.message?.content;
+        if (!text) throw new Error('Empty OpenRouter response');
+        console.log('Served by: openrouter');
+        return { text, provider: 'openrouter' };
+      }
     } catch (err) {
-      errors.push(`OpenRouter: ${err.message}`);
-      console.error('OpenRouter error:', err.message);
+      if (!errors.some(e => e.startsWith('OpenRouter'))) errors.push(`OpenRouter: ${err.message}`);
+      console.warn('OpenRouter error, trying Groq:', err.message);
+    }
+  }
+
+  /* ── 3. Groq (Llama 3.3 70B) ─────────────────────────────── */
+  if (groqKey) {
+    try {
+      const messages = [];
+      if (system) messages.push({ role: 'system', content: system });
+      messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
+
+      const res  = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: maxTokens, temperature, messages }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data?.error?.message || `Groq HTTP ${res.status}`);
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Empty Groq response');
+      console.log('Served by: groq');
+      return { text, provider: 'groq' };
+    } catch (err) {
+      errors.push(`Groq: ${err.message}`);
+      console.error('Groq error:', err.message);
     }
   }
 
