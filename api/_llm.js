@@ -1,134 +1,100 @@
 /**
- * Shared LLM helper — three providers in priority order:
- * 1. Gemini Flash  (primary   — 1,500 req/day free)
- * 2. Groq          (secondary — 14,400 req/day free)
- * 3. OpenRouter    (tertiary  — free models, extra buffer)
- *
- * Auto-falls-through on 429 or 5xx. Users see nothing.
+ * Shared LLM helper — two providers:
+ * 1. Gemini 1.5 Flash (primary   — free, fast)
+ * 2. Groq Llama 3.3  (fallback   — 14,400 req/day free)
  */
 
-const GEMINI_URL = model =>
-  `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-const GROQ_URL       = 'https://api.groq.com/openai/v1/chat/completions';
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-// Currently active free models on OpenRouter (updated May 2026)
-const OPENROUTER_MODELS = [
-  'deepseek/deepseek-chat-v3-0324:free',
-  'meta-llama/llama-4-scout:free',
-  'qwen/qwen3-8b:free',
-  'google/gemma-3-12b-it:free',
-];
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent`;
+const GROQ_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
 /**
  * callLLM({ system, userMessages, temperature, maxTokens })
- * userMessages: [{ role: 'user'|'assistant'|'model', content: string }]
  * Returns: { text: string, provider: string }
  */
 export async function callLLM({ system, userMessages, temperature = 0.4, maxTokens = 600 }) {
-  const geminiKey    = process.env.GEMINI_API_KEY;
-  const groqKey      = process.env.GROQ_API_KEY;
-  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const groqKey   = process.env.GROQ_API_KEY;
 
-  const errors = [];
-
-  /* ── 1. Gemini Flash ──────────────────────────────────────── */
+  /* ── 1. Gemini ──────────────────────────────────────────────
+     v1 API doesn't support system_instruction field, so we
+     prepend the system prompt to the first user message instead.
+  ────────────────────────────────────────────────────────────── */
   if (geminiKey) {
     try {
-      const contents = userMessages.map(m => ({
+      // Merge system prompt into first user message
+      const msgs = [...userMessages];
+      if (system && msgs.length > 0 && msgs[0].role === 'user') {
+        msgs[0] = { ...msgs[0], content: `${system}\n\n${msgs[0].content}` };
+      } else if (system) {
+        msgs.unshift({ role: 'user', content: system });
+      }
+
+      // Convert to Gemini content format (alternating user/model)
+      const contents = msgs.map(m => ({
         role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
         parts: [{ text: m.content }],
       }));
-      const body = { contents, generationConfig: { temperature, maxOutputTokens: maxTokens } };
-      if (system) body.system_instruction = { parts: [{ text: system }] };
 
-      const res  = await fetch(GEMINI_URL('gemini-1.5-flash-latest'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          generationConfig: { temperature, maxOutputTokens: maxTokens },
+        }),
       });
+
       const data = await res.json();
 
       if (res.status === 429 || res.status >= 500) {
-        const reason = data?.error?.message || res.status;
-        errors.push(`Gemini: ${reason}`);
-        console.warn(`Gemini unavailable (${reason}), trying OpenRouter…`);
-      } else if (!res.ok) {
-        throw new Error(data?.error?.message || `Gemini HTTP ${res.status}`);
-      } else {
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error('Empty Gemini response');
-        return { text, provider: 'gemini' };
+        console.warn(`Gemini rate-limited/unavailable (${res.status}), falling back to Groq`);
+        throw new Error('retry_groq');
       }
+      if (!res.ok) {
+        const msg = data?.error?.message || `Gemini HTTP ${res.status}`;
+        console.warn(`Gemini error: ${msg}, falling back to Groq`);
+        throw new Error('retry_groq');
+      }
+
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('retry_groq');
+
+      console.log('Served by: gemini');
+      return { text, provider: 'gemini' };
+
     } catch (err) {
-      if (!errors.some(e => e.startsWith('Gemini'))) errors.push(`Gemini: ${err.message}`);
-      console.warn('Gemini error, trying OpenRouter:', err.message);
-    }
-  }
-
-  /* ── 2. OpenRouter (tries multiple free models) ──────────── */
-  if (openrouterKey) {
-    for (const model of OPENROUTER_MODELS) {
-      try {
-        const messages = [];
-        if (system) messages.push({ role: 'system', content: system });
-        messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
-
-        const res  = await fetch(OPENROUTER_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openrouterKey}`,
-            'HTTP-Referer': 'https://ai-interview.solutions',
-            'X-Title': 'AI Interview Prep',
-          },
-          body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages }),
-        });
-        const data = await res.json();
-
-        if (res.status === 429 || res.status >= 500 || data?.error) {
-          const reason = data?.error?.message || res.status;
-          console.warn(`OpenRouter model ${model} unavailable (${reason}), trying next…`);
-          continue; // try next model
-        }
-
-        const text = data?.choices?.[0]?.message?.content;
-        if (!text) { console.warn(`OpenRouter model ${model} returned empty, trying next…`); continue; }
-        console.log(`Served by: openrouter (${model})`);
-        return { text, provider: 'openrouter' };
-
-      } catch (err) {
-        console.warn(`OpenRouter model ${model} error: ${err.message}, trying next…`);
+      if (err.message !== 'retry_groq') {
+        console.warn(`Gemini unexpected error: ${err.message}, falling back to Groq`);
       }
     }
-    errors.push('OpenRouter: all models failed');
-    console.warn('OpenRouter all models failed, trying Groq…');
   }
 
-  /* ── 3. Groq (Llama 3.3 70B) ─────────────────────────────── */
-  if (groqKey) {
-    try {
-      const messages = [];
-      if (system) messages.push({ role: 'system', content: system });
-      messages.push(...userMessages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })));
+  /* ── 2. Groq ────────────────────────────────────────────── */
+  if (!groqKey) throw new Error('No AI API keys configured.');
 
-      const res  = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: maxTokens, temperature, messages }),
-      });
-      const data = await res.json();
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push(...userMessages.map(m => ({
+    role: m.role === 'model' ? 'assistant' : m.role,
+    content: m.content,
+  })));
 
-      if (!res.ok) throw new Error(data?.error?.message || `Groq HTTP ${res.status}`);
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error('Empty Groq response');
-      console.log('Served by: groq');
-      return { text, provider: 'groq' };
-    } catch (err) {
-      errors.push(`Groq: ${err.message}`);
-      console.error('Groq error:', err.message);
-    }
-  }
+  const res = await fetch(GROQ_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: maxTokens,
+      temperature,
+      messages,
+    }),
+  });
 
-  /* ── All providers failed ────────────────────────────────── */
-  throw new Error(`All AI providers unavailable. ${errors.join(' | ')}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || `Groq HTTP ${res.status}`);
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Empty Groq response');
+
+  console.log('Served by: groq');
+  return { text, provider: 'groq' };
 }
