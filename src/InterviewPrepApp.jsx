@@ -102,10 +102,19 @@ const TrendChart = ({ data }) => {
   );
 };
 
-/* Sidebar defined OUTSIDE main component — stable reference, never remounts */
+/* Sidebar defined OUTSIDE main component */
+function calcAvg(interviews) {
+  if (!interviews.length) return null;
+  const total = interviews.reduce(function(s, i) { return s + i.score; }, 0);
+  return Math.round(total / interviews.length);
+}
+
 const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, onUpgrade }) => {
-  const st=interviews.length;
-  const avg = st ? Math.round(interviews.reduce((s,i)=>s+i.score, 0) / st) : null;
+  const st = interviews.length;
+  const avg = calcAvg(interviews);
+  const avgLabel = avg !== null ? (avg + ' out of 10') : '';
+  const planLabel = (user && isPro) ? 'Unlimited everything' : 'Unlimited MC, 5 AI per day';
+  const planTitle = (user && isPro) ? 'Pro Plan' : 'Free Plan';
   return (
     <div className="sb" style={{width:220,background:'#fff',borderRight:'1px solid #E5E7EB',display:'flex',flexDirection:'column',padding:'0 10px',flexShrink:0}}>
       <div style={{padding:'20px 6px 20px',borderBottom:'1px solid #F3F4F6'}}>
@@ -122,7 +131,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
           </button>
         ))}
       </div>
-      {st>0&&(
+      {st > 0 && (
         <div style={{margin:'0 0 12px',background:'#F9FAFB',borderRadius:10,border:'1px solid #E5E7EB',padding:'12px'}}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
             <span style={{fontSize:12,color:'#9CA3AF'}}>Sessions</span>
@@ -130,7 +139,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
           </div>
           <div style={{display:'flex',justifyContent:'space-between'}}>
             <span style={{fontSize:12,color:'#9CA3AF'}}>Avg score</span>
-            <span style={{fontSize:12,fontWeight:600,color:'#6366F1'}}>{avg + '/10'}</span>
+            <span style={{fontSize:12,fontWeight:600,color:'#6366F1'}}>{avgLabel}</span>
           </div>
         </div>
       )}
@@ -142,14 +151,13 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
           </div>
         ) : (
           <button onClick={()=>onSignIn()} style={{width:'100%',marginBottom:10,padding:'10px 12px',background:'#EEF2FF',border:'1px solid #C7D2FE',borderRadius:10,cursor:'pointer',fontSize:13,fontWeight:600,color:'#4F46E5',textAlign:'left'}}>
-            Sign in · Create account →
+            Sign in or Create account
           </button>
         )}
         <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:10,padding:'10px 12px'}}>
-          <p style={{fontSize:12,fontWeight:600,color:'#15803D',marginBottom:2}}>{user && isPro ? '⚡ Pro' : 'Free Plan'}</p>
-          <p style={{fontSize:11,color:'#6B7280'}}>{user && isPro ? 'Unlimited everything' : 'Unlimited MC · 5 AI per day'}</p>
-          {user && !isPro && <button onClick={onUpgrade} style={{marginTop:6,background:'#6366F1',border:'none',borderRadius:6,color:'#fff',fontSize:11,fontWeight:600,padding:'4px 10px',cursor:'pointer',width:'100%'}}>Upgrade to Pro →</button>}
-        </div>
+          <p style={{fontSize:12,fontWeight:600,color:'#15803D',marginBottom:2}}>{planTitle}</p>
+          <p style={{fontSize:11,color:'#6B7280'}}>{planLabel}</p>
+          {user && !isPro && <button onClick={onUpgrade} style={{marginTop:6,background:'#6366F1',border:'none',borderRadius:6,color:'#fff',fontSize:11,fontWeight:600,padding:'4px 10px',cursor:'pointer',width:'100%'}}>Upgrade to Pro</button>}
         </div>
       </div>
     </div>
