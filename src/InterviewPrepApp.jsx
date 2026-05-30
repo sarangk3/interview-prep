@@ -102,7 +102,7 @@ const TrendChart = ({ data }) => {
 };
 
 /* Sidebar defined OUTSIDE main component — stable reference, never remounts */
-const Sidebar = ({ page, setPage, interviews, user, onLogout }) => {
+const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn }) => {
   const st=interviews.length;
   const avg=st?Math.round(interviews.reduce((s,i)=>s+i.score,0)/st):null;
   return (
@@ -134,11 +134,15 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout }) => {
         </div>
       )}
       <div style={{padding:'0 0 16px'}}>
-        {user && (
+        {user ? (
           <div style={{marginBottom:10,padding:'10px 12px',background:'#F9FAFB',borderRadius:10,border:'1px solid #E5E7EB'}}>
             <p style={{fontSize:11,color:'#9CA3AF',marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email}</p>
             <button onClick={onLogout} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'#DC2626',fontWeight:500,padding:0}}>Sign out</button>
           </div>
+        ) : (
+          <button onClick={()=>onSignIn()} style={{width:'100%',marginBottom:10,padding:'10px 12px',background:'#EEF2FF',border:'1px solid #C7D2FE',borderRadius:10,cursor:'pointer',fontSize:13,fontWeight:600,color:'#4F46E5',textAlign:'left'}}>
+            Sign in / Create account →
+          </button>
         )}
         <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:10,padding:'10px 12px'}}>
           <p style={{fontSize:12,fontWeight:600,color:'#15803D',marginBottom:2}}>Free Plan</p>
@@ -153,11 +157,12 @@ export default function InterviewPrepApp() {
   const [page,setPage]             = useState('home');
   const [user,setUser]             = useState(null);
   const [authLoading,setAuthLoading] = useState(true);
-  const [authMode,setAuthMode]     = useState('login'); // 'login' | 'signup'
+  const [authMode,setAuthMode]     = useState('signup'); // default to signup on results gate
   const [authEmail,setAuthEmail]   = useState('');
   const [authPassword,setAuthPassword] = useState('');
   const [authError,setAuthError]   = useState('');
   const [authWorking,setAuthWorking] = useState(false);
+  const [pendingInterview,setPendingInterview] = useState(null); // holds completed interview for anonymous users
   const [interviews,setInterviews] = useState([]);
   const [format,setFormat]         = useState('text');
   const [difficulty,setDifficulty] = useState('medium');
@@ -217,7 +222,7 @@ export default function InterviewPrepApp() {
   };
 
   // Auth handlers
-  const handleAuth = async () => {
+  const handleAuth = async (onSuccess) => {
     if(!authEmail.trim()||!authPassword.trim()) return setAuthError('Please enter your email and password.');
     setAuthWorking(true); setAuthError('');
     try {
@@ -231,7 +236,20 @@ export default function InterviewPrepApp() {
       } else {
         result = await supabase.auth.signInWithPassword({ email:authEmail.trim(), password:authPassword });
       }
-      if(result.error) setAuthError(result.error.message);
+      if(result.error) { setAuthError(result.error.message); setAuthWorking(false); return; }
+      // Save pending interview if coming from results gate
+      if(result.data.user && pendingInterview) {
+        const u = result.data.user;
+        await supabase.from('interviews').insert([{
+          user_id: u.id, role: pendingInterview.role, industry: pendingInterview.industry,
+          format: pendingInterview.format, mode: pendingInterview.mode,
+          difficulty: pendingInterview.difficulty||null, score: pendingInterview.score,
+          problem_title: pendingInterview.problemTitle||null, responses: pendingInterview.responses,
+        }]);
+        setPendingInterview(null);
+        setPage('results');
+      }
+      if(onSuccess) onSuccess();
     } catch(e) { setAuthError('Something went wrong. Please try again.'); }
     setAuthWorking(false);
   };
@@ -328,8 +346,8 @@ export default function InterviewPrepApp() {
           const iv={role,mode:'mock',format:'mock',industry,difficulty,
             date:new Date().toISOString(),score:scoreData.score.overall,
             problemTitle:sessionMeta.problemTitle,messages:withReply,mockScore:scoreData.score};
-          saveInterview(iv);
-          setPage('results');
+          if(user){ saveInterview(iv); setPage('results'); }
+          else { setPendingInterview(iv); setPage('results-gate'); }
         }
       }
     }catch(err){setErrorMsg(typeof err==='string'?err:(err?.message||'Error. Please try again.'));}
@@ -380,8 +398,9 @@ export default function InterviewPrepApp() {
   const finishInterview=(responses,fmt2)=>{
     const score=fmt2==='mc'?Math.round((responses.filter(r=>r.isCorrect).length/responses.length)*10):Math.round(responses.reduce((s,r)=>s+r.feedback.overall,0)/responses.length);
     const iv={role,mode,format:fmt2,industry,date:new Date().toISOString(),score,responses};
-    saveInterview(iv);
-    setResults(responses);setPage('results');
+    setResults(responses);
+    if(user){ saveInterview(iv); setPage('results'); }
+    else { setPendingInterview(iv); setPage('results-gate'); }
   };
 
   const buildTranscript=()=>{
@@ -414,11 +433,37 @@ export default function InterviewPrepApp() {
   const isLast = qIndex===sessionQs.length-1;
   const isMC = format==='mc';
 
+  /* ── Reusable auth form ── */
+  const renderAuthForm = (onSuccessNav) => (
+    <div className="card" style={{padding:28}}>
+      <div style={{display:'flex',gap:0,marginBottom:20,background:'#F3F4F6',borderRadius:10,padding:4}}>
+        {['signup','login'].map(m=>(
+          <button key={m} onClick={()=>{setAuthMode(m);setAuthError('');}} style={{flex:1,padding:'8px',border:'none',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,background:authMode===m?'#fff':'transparent',color:authMode===m?'#111827':'#9CA3AF',boxShadow:authMode===m?'0 1px 3px rgba(0,0,0,0.1)':'none',transition:'all .15s'}}>
+            {m==='signup'?'Create account':'Sign in'}
+          </button>
+        ))}
+      </div>
+      {authError&&<div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13,color:'#991B1B'}}>{authError}</div>}
+      <div style={{marginBottom:12}}>
+        <label style={{fontSize:13,fontWeight:500,color:'#374151',display:'block',marginBottom:5}}>Email</label>
+        <input type="email" placeholder="you@company.com" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleAuth(onSuccessNav)} style={{width:'100%',padding:'10px 14px',border:'1px solid #E5E7EB',borderRadius:8,fontSize:14,color:'#111827',background:'#F9FAFB'}}/>
+      </div>
+      <div style={{marginBottom:18}}>
+        <label style={{fontSize:13,fontWeight:500,color:'#374151',display:'block',marginBottom:5}}>Password</label>
+        <input type="password" placeholder="••••••••" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleAuth(onSuccessNav)} style={{width:'100%',padding:'10px 14px',border:'1px solid #E5E7EB',borderRadius:8,fontSize:14,color:'#111827',background:'#F9FAFB'}}/>
+      </div>
+      <button className="bp" onClick={()=>handleAuth(onSuccessNav)} disabled={authWorking} style={{width:'100%',padding:'12px',fontSize:15,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+        {authWorking?<><span className="spinner"/>Working…</>:authMode==='signup'?'Create account & see results →':'Sign in & see results →'}
+      </button>
+      {authMode==='login'&&<button onClick={handleForgotPassword} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:10,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>Forgot password?</button>}
+    </div>
+  );
+
   return (
     <>
       <G/>
 
-      {/* ── Loading ── */}
+      {/* ── Loading spinner (brief, while checking session) ── */}
       {authLoading && (
         <div style={{position:'fixed',inset:0,background:'#F9FAFB',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000}}>
           <div style={{textAlign:'center'}}>
@@ -428,52 +473,8 @@ export default function InterviewPrepApp() {
         </div>
       )}
 
-      {/* ── Auth page ── */}
-      {!authLoading && !user && (
-        <div style={{minHeight:'100vh',background:'#F9FAFB',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
-          <div style={{width:'100%',maxWidth:400}}>
-            <div style={{textAlign:'center',marginBottom:36}}>
-              <div style={{width:48,height:48,borderRadius:14,background:'linear-gradient(135deg,#6366F1,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,margin:'0 auto 16px'}}>⚡</div>
-              <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:6}}>AI Interview Solutions</h1>
-              <p style={{color:'#9CA3AF',fontSize:14}}>Practice interviews for AI-era tech roles</p>
-            </div>
-            <div className="card" style={{padding:32}}>
-              <div style={{display:'flex',gap:0,marginBottom:24,background:'#F3F4F6',borderRadius:10,padding:4}}>
-                {['login','signup'].map(m=>(
-                  <button key={m} onClick={()=>{setAuthMode(m);setAuthError('');}} style={{flex:1,padding:'8px',border:'none',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,background:authMode===m?'#fff':'transparent',color:authMode===m?'#111827':'#9CA3AF',boxShadow:authMode===m?'0 1px 3px rgba(0,0,0,0.1)':'none',transition:'all .15s'}}>
-                    {m==='login'?'Sign in':'Create account'}
-                  </button>
-                ))}
-              </div>
-              {authError && <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#991B1B'}}>{authError}</div>}
-              <div style={{marginBottom:14}}>
-                <label style={{fontSize:13,fontWeight:500,color:'#374151',display:'block',marginBottom:6}}>Email</label>
-                <input type="email" placeholder="you@company.com" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleAuth()}
-                  style={{width:'100%',padding:'10px 14px',border:'1px solid #E5E7EB',borderRadius:8,fontSize:14,color:'#111827',background:'#F9FAFB'}}/>
-              </div>
-              <div style={{marginBottom:20}}>
-                <label style={{fontSize:13,fontWeight:500,color:'#374151',display:'block',marginBottom:6}}>Password</label>
-                <input type="password" placeholder="••••••••" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleAuth()}
-                  style={{width:'100%',padding:'10px 14px',border:'1px solid #E5E7EB',borderRadius:8,fontSize:14,color:'#111827',background:'#F9FAFB'}}/>
-              </div>
-              <button className="bp" onClick={handleAuth} disabled={authWorking} style={{width:'100%',padding:'12px',fontSize:15,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                {authWorking?<><span className="spinner"/>Working…</>:authMode==='login'?'Sign in →':'Create account →'}
-              </button>
-              {authMode==='login' && (
-                <button onClick={handleForgotPassword} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:12,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
-                  Forgot password?
-                </button>
-              )}
-            </div>
-            <p style={{textAlign:'center',color:'#D1D5DB',fontSize:12,marginTop:20}}>
-              Free forever · No credit card needed
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Main app (logged in) ── */}
-      {!authLoading && user && (<>
+      {/* ── Main app — always shown once loading is done ── */}
+      {!authLoading && (<>
       {/* ── Inline error banner ── */}
       {errorMsg && (
         <div style={{position:'fixed',top:0,left:0,right:0,zIndex:1000,background:'#FEF2F2',borderBottom:'1px solid #FECACA',padding:'12px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
@@ -498,8 +499,24 @@ export default function InterviewPrepApp() {
         </div>
       )}
       <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
-        <Sidebar page={page} setPage={setPage} interviews={interviews} user={user} onLogout={handleLogout}/>
+        <Sidebar page={page} setPage={setPage} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}}/>
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+
+          {/* ── Auth modal (standalone sign in page) ── */}
+          {page==='signin' && (
+            <div style={{flex:1,overflowY:'auto',display:'flex',alignItems:'center',justifyContent:'center',padding:24,background:'#F9FAFB'}}>
+              <div style={{width:'100%',maxWidth:400}}>
+                <div style={{textAlign:'center',marginBottom:28}}>
+                  <h2 style={{fontSize:22,fontWeight:700,color:'#111827',marginBottom:6}}>Welcome back</h2>
+                  <p style={{color:'#9CA3AF',fontSize:14}}>Sign in or create an account to track your progress.</p>
+                </div>
+                {renderAuthForm(()=>setPage('home'))}
+                <button onClick={()=>setPage('home')} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:14,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
+                  ← Continue without signing in
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ════ INTERVIEW ════ */}
           {page==='interview' && format==='mock' && (
@@ -659,8 +676,37 @@ export default function InterviewPrepApp() {
           )}
 
           {/* ════ SCROLLABLE PAGES ════ */}
-          {page!=='interview' && (
+          {page!=='interview' && page!=='signin' && (
             <div style={{flex:1,overflowY:'auto'}}>
+
+              {/* ── RESULTS GATE (anonymous user completed an interview) ── */}
+              {page==='results-gate' && pendingInterview && (
+                <div style={{maxWidth:480,margin:'0 auto',padding:'48px 24px'}}>
+                  {/* Score teaser */}
+                  <div style={{textAlign:'center',marginBottom:32}}>
+                    <div style={{width:72,height:72,borderRadius:'50%',background:'linear-gradient(135deg,#6366F1,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,margin:'0 auto 20px',boxShadow:'0 8px 32px rgba(99,102,241,.3)'}}>🎯</div>
+                    <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:8}}>Your results are ready</h1>
+                    <p style={{color:'#6B7280',fontSize:15,lineHeight:1.6}}>
+                      You just completed a <strong>{pendingInterview.role}</strong> interview in <strong>{pendingInterview.industry}</strong>.
+                      Create a free account to see your full score, feedback, and coaching.
+                    </p>
+                  </div>
+                  {/* What they'll see */}
+                  <div className="card" style={{padding:'16px 20px',marginBottom:20,background:'#F5F3FF',border:'1px solid #DDD6FE'}}>
+                    <p style={{fontSize:12,fontWeight:700,color:'#6D28D9',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>You'll unlock</p>
+                    {['Detailed score across 4 dimensions','Specific strengths and areas to improve','Expert coaching on what a strong answer covers','Full session history across devices','Score trend over time'].map((item,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
+                        <span style={{color:'#7C3AED',fontWeight:700,flexShrink:0}}>✓</span>
+                        <span style={{fontSize:13,color:'#4C1D95'}}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {renderAuthForm(null)}
+                  <button onClick={()=>setPage('home')} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:14,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
+                    Skip for now — practice another question
+                  </button>
+                </div>
+              )}
 
               {/* ── HOME ── */}
               {page==='home' && (
@@ -1015,11 +1061,22 @@ export default function InterviewPrepApp() {
                     </div>
                     {!st?(
                       <div style={{textAlign:'center',padding:'60px 0'}}>
-                        <p style={{fontSize:40,marginBottom:16}}>📈</p>
-                        <p style={{fontSize:18,fontWeight:600,color:'#374151',marginBottom:8}}>No sessions yet</p>
-                        <p style={{color:'#9CA3AF',marginBottom:8,fontSize:14}}>Complete your first interview to start tracking your progress.</p>
-                        <p style={{color:'#D1D5DB',marginBottom:24,fontSize:13}}>You'll see your score trends, practice breakdown by role, and session history here.</p>
-                        <button className="bp" onClick={()=>setPage('home')} style={{padding:'12px 28px',fontSize:15}}>Start Practicing</button>
+                        {!user ? (
+                          <>
+                            <p style={{fontSize:40,marginBottom:16}}>🔒</p>
+                            <p style={{fontSize:18,fontWeight:600,color:'#374151',marginBottom:8}}>Sign in to track your progress</p>
+                            <p style={{color:'#9CA3AF',marginBottom:24,fontSize:14}}>Create a free account to save your history and see your score trends.</p>
+                            <button className="bp" onClick={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} style={{padding:'12px 28px',fontSize:15}}>Create free account →</button>
+                          </>
+                        ) : (
+                          <>
+                            <p style={{fontSize:40,marginBottom:16}}>📈</p>
+                            <p style={{fontSize:18,fontWeight:600,color:'#374151',marginBottom:8}}>No sessions yet</p>
+                            <p style={{color:'#9CA3AF',marginBottom:8,fontSize:14}}>Complete your first interview to start tracking your progress.</p>
+                            <p style={{color:'#D1D5DB',marginBottom:24,fontSize:13}}>You'll see your score trends, practice breakdown by role, and session history here.</p>
+                            <button className="bp" onClick={()=>setPage('home')} style={{padding:'12px 28px',fontSize:15}}>Start Practicing</button>
+                          </>
+                        )}
                       </div>
                     ):(
                       <>
