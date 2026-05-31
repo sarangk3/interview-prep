@@ -335,6 +335,23 @@ export default function InterviewPrepApp() {
 
   const isPro = profile?.is_pro && (!profile?.pro_expires_at || new Date(profile.pro_expires_at) > new Date());
 
+  // Keep user in the app when pressing back — push a dummy history entry on mount
+  // then intercept popstate to navigate within the app instead of leaving
+  useEffect(() => {
+    window.history.pushState(null, '', window.location.href);
+    const handlePop = () => {
+      window.history.pushState(null, '', window.location.href);
+      // Navigate back within the app based on current page
+      if (page === 'interview') { setConfirmExit(true); }
+      else if (page === 'results' || page === 'results-gate') { setPage('home'); }
+      else if (page === 'signin') { setPage('roles'); }
+      else if (selectedRole) { setSelectedRole(null); }
+      else { setPage('roles'); }
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [page, selectedRole]);
+
 
 
   const startUpgrade = async (priceId) => {
