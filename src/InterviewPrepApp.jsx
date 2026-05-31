@@ -36,6 +36,7 @@ const G = () => (
     @media(max-width:768px){
       .sb{display:none!important;} .isp{flex-direction:column!important;}
       .ap{width:100%!important;border-left:none!important;border-top:1px solid #E5E7EB!important;}
+      .qleft{max-height:40vh;overflow-y:auto;}
       .mp{padding:20px 16px!important;} .s4{grid-template-columns:repeat(2,1fr)!important;}
       .s2{grid-template-columns:1fr!important;} .rg{grid-template-columns:1fr!important;}
       .mobile-content{padding-bottom:72px!important;}
@@ -199,6 +200,7 @@ export default function InterviewPrepApp() {
   const [company,setCompany]       = useState('Anthropic');
   const [selectedRole,setSelectedRole] = useState(null);
   const [showProfileSheet,setShowProfileSheet] = useState(false);
+  const [activeTab,setActiveTab] = useState('role');
   const [mockMessages,setMockMessages]   = useState([]);
   const [mockTurnCount,setMockTurnCount] = useState(0);
   const [mockThinking,setMockThinking]   = useState(false);
@@ -337,6 +339,7 @@ export default function InterviewPrepApp() {
     window.history.pushState({ page: newPage }, '', '/');
     setPage(newPage);
     setSelectedRole(null);
+    setActiveTab('role');
   };
 
   // Handle browser back/forward buttons
@@ -827,8 +830,8 @@ export default function InterviewPrepApp() {
           )}
           {page==='interview' && format!=='mock' && q && cfg && (
             <div className="isp" style={{display:'flex',flex:1,overflow:'hidden'}}>
-              {/* Left, question (stable, no key that changes) */}
-              <div style={{flex:1,padding:'28px 32px',overflowY:'auto',borderRight:'1px solid #E5E7EB',background:'#F9FAFB'}}>
+              {/* Left, question */}
+              <div className="qleft" style={{flex:1,padding:'28px 32px',overflowY:'auto',borderRight:'1px solid #E5E7EB',background:'#F9FAFB'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:18,flexWrap:'wrap'}}>
                   <button className="bg" onClick={()=>navigate('home')} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
                   <div style={{padding:'3px 10px',borderRadius:20,background:cfg.bg,border:`1px solid ${cfg.border}`,fontSize:12,fontWeight:600,color:cfg.color}}>{role}</div>
@@ -854,20 +857,21 @@ export default function InterviewPrepApp() {
               <div className="ap" style={{width:400,padding:'28px',display:'flex',flexDirection:'column',background:'#fff',overflowY:'auto',flexShrink:0}}>
                 {isMC ? (
                   <>
-                    <p style={{fontSize:14,fontWeight:600,color:'#374151',marginBottom:14}}>Select the best answer</p>
-                    <div style={{display:'flex',flexDirection:'column',gap:10,flex:1}}>
+                    <p style={{fontSize:13,fontWeight:600,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:16}}>Select the best answer</p>
+                    <div style={{display:'flex',flexDirection:'column',gap:12,flex:1}}>
                       {q.options.map((opt,i)=>(
-                        <div key={i} className={`mo ${mcChoice===i?'sel':''}`} onClick={()=>setMcChoice(i)}>
-                          <div style={{width:28,height:28,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,
-                            background:mcChoice===i?'#6366F1':'#F9FAFB',color:mcChoice===i?'#fff':'#6B7280',border:`1.5px solid ${mcChoice===i?'#6366F1':'#E5E7EB'}`}}>
+                        <div key={i} className={`mo ${mcChoice===i?'sel':''}`} onClick={()=>setMcChoice(i)}
+                          style={{padding:'16px 18px',alignItems:'flex-start'}}>
+                          <div style={{width:30,height:30,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,marginTop:1,
+                            background:mcChoice===i?'#6366F1':'#F3F4F6',color:mcChoice===i?'#fff':'#6B7280',border:`1.5px solid ${mcChoice===i?'#6366F1':'#E5E7EB'}`}}>
                             {mcChoice===i?'✓':String.fromCharCode(65+i)}
                           </div>
-                          <span style={{fontSize:14,color:mcChoice===i?'#111827':'#4B5563',lineHeight:1.5}}>{opt}</span>
+                          <span style={{fontSize:14,color:mcChoice===i?'#111827':'#4B5563',lineHeight:1.6}}>{opt}</span>
                         </div>
                       ))}
                     </div>
-                    <button className="bp" onClick={submitMC} disabled={mcChoice===null} style={{marginTop:18,width:'100%',padding:'13px',fontSize:15}}>
-                      {isLast?'Finish & See Results →':'Next Question →'}
+                    <button className="bp" onClick={submitMC} disabled={mcChoice===null} style={{marginTop:20,width:'100%',padding:'14px',fontSize:15}}>
+                      {isLast?'Finish and see results →':'Next question →'}
                     </button>
                   </>
                 ) : (
@@ -915,7 +919,6 @@ export default function InterviewPrepApp() {
 
               {/* ── ROLES GUIDE ── */}
               {page==='roles' && (()=>{
-                const [activeTab, setActiveTab] = React.useState('role');
 
                 const INTERVIEW_GUIDES = {
                   'AI Solutions Architect': {
