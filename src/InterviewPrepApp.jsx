@@ -404,12 +404,30 @@ export default function InterviewPrepApp() {
     stopSpeech();
     const speakRole = roleOverride || role;
 
-    // Try ElevenLabs first
+    const VOICE_MAP = {
+      'AI Solutions Architect':           'TxGEqnHWrfWFTfGW9XjX',
+      'Forward Deployed Engineer':        'TxGEqnHWrfWFTfGW9XjX',
+      'Forward Deployed Product Manager': '21m00Tcm4TlvDq8ikWAM',
+      'Technical Program Manager':        'pNInz6obpgDQGcFmaJgB',
+    };
+    const voiceId = VOICE_MAP[speakRole] || 'TxGEqnHWrfWFTfGW9XjX';
+    const apiKey = 'sk_1d2128c797de3f6ebf85c7991fbc3fd28dab7f2f0afcf62e';
+
+    // Call ElevenLabs directly from the browser (no Vercel proxy needed)
     try {
-      const res = await fetch('/api/tts', {
+      const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/#{1,3} /g,'');
+      const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, role: speakRole }),
+        headers: {
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text: clean,
+          model_id: 'eleven_turbo_v2',
+          voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
+        }),
       });
       if (res.ok) {
         const blob = await res.blob();
@@ -425,10 +443,9 @@ export default function InterviewPrepApp() {
         }
       }
     } catch(e) {
-      console.warn('ElevenLabs TTS unavailable:', e.message);
+      console.warn('ElevenLabs direct call failed, using browser TTS:', e.message);
     }
 
-    // Browser TTS fallback
     fallbackTTS(text);
   };
 
