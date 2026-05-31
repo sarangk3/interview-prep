@@ -142,7 +142,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
       </div>
       <div style={{padding:'14px 0',flex:1}}>
         <p style={{fontSize:11,fontWeight:600,color:'#9CA3AF',padding:'0 12px',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>Practice</p>
-        {[{id:'roles',label:'Role Guides',icon:''},{id:'home',label:'Question Bank',icon:''},{id:'dashboard',label:'My Progress',icon:''}].map(item=>(
+        {[{id:'home',label:'Practice',icon:''},{id:'roles',label:'Learn',icon:''},{id:'dashboard',label:'My Progress',icon:''}].map(item=>(
           <button key={item.id} className={`ni ${page===item.id?'on':''}`} onClick={()=>setPage(item.id)}>
             {item.label}
           </button>
@@ -185,7 +185,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
 };
 
 export default function InterviewPrepApp() {
-  const [page,setPage]             = useState('roles');
+  const [page,setPage]             = useState('home');
   const [user,setUser]             = useState(null);
   const [authLoading,setAuthLoading] = useState(true);
   const [authMode,setAuthMode]     = useState('signup');
@@ -931,7 +931,7 @@ export default function InterviewPrepApp() {
         {page!=='interview' && (
           <nav className="mob-bar">
             {[
-              {id:'roles',label:'Guides',icon:<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>},
+              {id:'roles',label:'Learn',icon:<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>},
               {id:'home',label:'Practice',icon:<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>},
               {id:'dashboard',label:'Progress',icon:<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>},
             ].map(tab=>(
@@ -1400,8 +1400,8 @@ export default function InterviewPrepApp() {
                     {!selected ? (
                       <>
                         <div className="fu" style={{marginBottom:28}}>
-                          <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:6}}>Role Guides</h1>
-                          <p style={{color:'#6B7280',fontSize:15}}>Detailed breakdowns of each AI-era tech role, what they do, what skills they need, and how they work together.</p>
+                          <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:6}}>Learn</h1>
+                          <p style={{color:'#6B7280',fontSize:15}}>Understand each role and how to ace the interview. Click any role to open two tabs: a role overview and a step-by-step interview guide with real frameworks and example answers.</p>
                         </div>
                         <div className="rg" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:16}}>
                           {ROLE_ARTICLES.map(r=>(
@@ -1413,7 +1413,11 @@ export default function InterviewPrepApp() {
                                   <p style={{fontSize:12,color:r.cfg.color,fontWeight:600}}>{r.cfg.label}</p>
                                 </div>
                               </div>
-                              <p style={{fontSize:13,color:'#6B7280',lineHeight:1.6,marginBottom:14}}>{r.what.substring(0,140)}…</p>
+                              <p style={{fontSize:13,color:'#6B7280',lineHeight:1.6,marginBottom:12}}>{r.what.substring(0,140)}…</p>
+                            <div style={{display:'flex',gap:6,marginBottom:14}}>
+                              <span style={{fontSize:11,background:'#EEF2FF',color:'#4F46E5',padding:'2px 8px',borderRadius:10,fontWeight:500}}>Role overview</span>
+                              <span style={{fontSize:11,background:'#F0FDF4',color:'#059669',padding:'2px 8px',borderRadius:10,fontWeight:500}}>Interview guide</span>
+                            </div>
                               <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
                                 {r.companiesHiring.slice(0,4).map(c=>(
                                   <span key={c} style={{fontSize:11,background:'#F3F4F6',color:'#6B7280',padding:'2px 8px',borderRadius:10}}>{c}</span>
@@ -1650,7 +1654,12 @@ export default function InterviewPrepApp() {
                 <div className="mp" style={{maxWidth:820,margin:'0 auto',padding:'36px 32px'}}>
                   <div className="fu" style={{marginBottom:28}}>
                     <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:6}}>Practice Interviews</h1>
-                    <p style={{color:'#6B7280',fontSize:15}}>Choose your format and industry, then pick a role to begin.</p>
+                    <p style={{color:'#6B7280',fontSize:15,marginBottom:8}}>Choose your format and industry, then pick a role to begin.</p>
+                    <p style={{fontSize:13,color:'#9CA3AF'}}>New to these roles?{' '}
+                      <button onClick={()=>{setPage('roles');setSelectedRole(null);setActiveTab('role');}} style={{background:'none',border:'none',cursor:'pointer',color:'#6366F1',fontWeight:600,fontSize:13,padding:0,textDecoration:'underline'}}>
+                        Read the role and interview guides first
+                      </button>
+                    </p>
                   </div>
                   {/* Format */}
                   <div className="fu d1" style={{marginBottom:24}}>
@@ -1700,8 +1709,14 @@ export default function InterviewPrepApp() {
                               <span style={{fontSize:11,color:'#9CA3AF',background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:20,padding:'3px 10px'}}>{format==='mock'?`${MOCK_TURNS} rounds`:'5 Qs'}</span>
                             </div>
                             <p style={{fontWeight:600,fontSize:14,color:'#111827',marginBottom:4}}>{c.card||r}</p>
-                            {prob?<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14,lineHeight:1.4}}>{prob.title}</p>:<p style={{fontSize:12,color:'#9CA3AF',marginBottom:14}}>{c.label}</p>}
-                            <span style={{fontSize:12,color:'#6366F1',fontWeight:600}}>Start →</span>
+                            {prob?<p style={{fontSize:12,color:'#9CA3AF',marginBottom:10,lineHeight:1.4}}>{prob.title}</p>:<p style={{fontSize:12,color:'#9CA3AF',marginBottom:10}}>{c.label}</p>}
+                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                              <span style={{fontSize:12,color:'#6366F1',fontWeight:600}}>Start →</span>
+                              <button onClick={e=>{e.stopPropagation();setSelectedRole(r);setActiveTab('interview');setPage('roles');}}
+                                style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'#9CA3AF',fontWeight:500,padding:0,textDecoration:'underline'}}>
+                                Interview guide
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
