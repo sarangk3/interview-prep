@@ -126,7 +126,7 @@ function calcAvg(interviews) {
   return Math.round(total / interviews.length);
 }
 
-const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, onUpgrade }) => {
+const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, onUpgrade, onFeedback }) => {
   const st = interviews.length;
   const avg = calcAvg(interviews);
   const avgLabel = avg !== null ? (avg + ' out of 10') : '';
@@ -176,6 +176,9 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
           <p style={{fontSize:11,color:'#6B7280'}}>{planLabel}</p>
           {user && !isPro && <button onClick={onUpgrade} style={{marginTop:6,background:'#6366F1',border:'none',borderRadius:6,color:'#fff',fontSize:11,fontWeight:600,padding:'4px 10px',cursor:'pointer',width:'100%'}}>Upgrade to Pro</button>}
         </div>
+        <button onClick={onFeedback} style={{width:'100%',padding:'9px 12px',background:'none',border:'1px solid #E5E7EB',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:500,color:'#6B7280',textAlign:'left',marginBottom:4}}>
+          Share feedback or report a bug
+        </button>
       </div>
     </div>
   );
@@ -201,7 +204,12 @@ export default function InterviewPrepApp() {
   const [selectedRole,setSelectedRole] = useState(null);
   const [showProfileSheet,setShowProfileSheet] = useState(false);
   const [activeTab,setActiveTab] = useState('role');
-  const [mockAuthGate,setMockAuthGate] = useState(false);    // shows after mock turn 1
+  const [showFeedback,setShowFeedback]     = useState(false);
+  const [feedbackType,setFeedbackType]     = useState('Feature request');
+  const [feedbackMsg,setFeedbackMsg]       = useState('');
+  const [feedbackEmail,setFeedbackEmail]   = useState('');
+  const [feedbackSent,setFeedbackSent]     = useState(false);
+  const [feedbackWorking,setFeedbackWorking] = useState(false);
   const [writtenAuthGate,setWrittenAuthGate] = useState(false); // shows after written Q1
   const [mockMessages,setMockMessages]   = useState([]);
   const [mockTurnCount,setMockTurnCount] = useState(0);
@@ -562,7 +570,37 @@ export default function InterviewPrepApp() {
   const isMC = format==='mc';
 
   /* ── Reusable auth form ── */
-  const handleOAuth = async (provider) => {
+  const submitFeedback = async () => {
+    if (!feedbackMsg.trim()) return;
+    setFeedbackWorking(true);
+    try {
+      await fetch('/api/feedback-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: feedbackType,
+          message: feedbackMsg,
+          email: feedbackEmail || user?.email || '',
+          page,
+        }),
+      });
+      setFeedbackSent(true);
+      setTimeout(() => {
+        setShowFeedback(false);
+        setFeedbackSent(false);
+        setFeedbackMsg('');
+        setFeedbackType('Feature request');
+      }, 2000);
+    } catch(e) { console.error(e); }
+    setFeedbackWorking(false);
+  };
+
+  const openFeedback = () => {
+    setFeedbackEmail(user?.email || '');
+    setFeedbackSent(false);
+    setFeedbackMsg('');
+    setShowFeedback(true);
+  };
     setAuthError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -693,7 +731,49 @@ export default function InterviewPrepApp() {
           </div>
         </div>
       )}
-      {/* ── Mock interview auth gate (after turn 1) ── */}
+      {/* ── Feedback modal ── */}
+      {showFeedback && (
+        <div style={{position:'fixed',inset:0,zIndex:600,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={()=>setShowFeedback(false)}>
+          <div style={{background:'#fff',borderRadius:16,padding:28,maxWidth:420,width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}} onClick={e=>e.stopPropagation()}>
+            {feedbackSent ? (
+              <div style={{textAlign:'center',padding:'20px 0'}}>
+                <div style={{fontSize:36,marginBottom:12}}>✓</div>
+                <p style={{fontSize:16,fontWeight:600,color:'#111827',marginBottom:6}}>Thanks for the feedback</p>
+                <p style={{fontSize:13,color:'#6B7280'}}>We read every submission.</p>
+              </div>
+            ) : (
+              <>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+                  <h2 style={{fontSize:17,fontWeight:700,color:'#111827'}}>Share feedback</h2>
+                  <button onClick={()=>setShowFeedback(false)} style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:'#9CA3AF',lineHeight:1}}>×</button>
+                </div>
+                {/* Type selector */}
+                <div style={{display:'flex',gap:8,marginBottom:16}}>
+                  {['Feature request','Bug report','General'].map(t=>(
+                    <button key={t} onClick={()=>setFeedbackType(t)} style={{padding:'6px 12px',borderRadius:20,border:`1px solid ${feedbackType===t?'#6366F1':'#E5E7EB'}`,background:feedbackType===t?'#EEF2FF':'#fff',color:feedbackType===t?'#4F46E5':'#6B7280',fontSize:12,fontWeight:500,cursor:'pointer'}}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                {/* Message */}
+                <textarea value={feedbackMsg} onChange={e=>setFeedbackMsg(e.target.value)}
+                  placeholder={feedbackType==='Bug report'?'Describe what happened and what you expected...':feedbackType==='Feature request'?'What would you like to see added or improved?':'What\'s on your mind?'}
+                  style={{width:'100%',minHeight:110,padding:'12px',border:'1px solid #E5E7EB',borderRadius:8,fontSize:14,color:'#111827',background:'#F9FAFB',lineHeight:1.6,marginBottom:12,resize:'vertical'}}/>
+                {/* Email (pre-filled if logged in) */}
+                {!user && (
+                  <input type="email" placeholder="Your email (optional — if you'd like a reply)"
+                    value={feedbackEmail} onChange={e=>setFeedbackEmail(e.target.value)}
+                    style={{width:'100%',padding:'10px 12px',border:'1px solid #E5E7EB',borderRadius:8,fontSize:14,color:'#111827',background:'#F9FAFB',marginBottom:12}}/>
+                )}
+                <button className="bp" onClick={submitFeedback} disabled={!feedbackMsg.trim()||feedbackWorking}
+                  style={{width:'100%',padding:'11px',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                  {feedbackWorking?<><span className="spinner"/>Sending…</>:'Send feedback'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {mockAuthGate && (
         <div style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
           <div style={{background:'#fff',borderRadius:20,padding:36,maxWidth:420,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,0.25)'}}>
@@ -756,7 +836,7 @@ export default function InterviewPrepApp() {
         </div>
       )}
       <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
-        <Sidebar page={page} setPage={(p)=>{setPage(p);setSelectedRole(null);setActiveTab('role');}} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}}/>
+        <Sidebar page={page} setPage={(p)=>{setPage(p);setSelectedRole(null);setActiveTab('role');}} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}} onFeedback={openFeedback}/>
 
         {/* ── Right column: mobile header + page content ── */}
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
@@ -808,8 +888,11 @@ export default function InterviewPrepApp() {
                       <p style={{fontSize:12,color:'#6B7280',marginTop:2}}>Unlimited everything</p>
                     </div>
                   )}
-                  <button onClick={()=>{handleLogout();setShowProfileSheet(false);}} style={{width:'100%',padding:'12px',background:'none',border:'1px solid #FEE2E2',borderRadius:10,color:'#DC2626',fontSize:14,fontWeight:600,cursor:'pointer'}}>
+                  <button onClick={()=>{handleLogout();setShowProfileSheet(false);}} style={{width:'100%',padding:'12px',background:'none',border:'1px solid #FEE2E2',borderRadius:10,color:'#DC2626',fontSize:14,fontWeight:600,cursor:'pointer',marginBottom:10}}>
                     Sign out
+                  </button>
+                  <button onClick={()=>{setShowProfileSheet(false);openFeedback();}} style={{width:'100%',padding:'12px',background:'none',border:'1px solid #E5E7EB',borderRadius:10,color:'#6B7280',fontSize:14,cursor:'pointer'}}>
+                    Share feedback or report a bug
                   </button>
                 </>
               ) : (
