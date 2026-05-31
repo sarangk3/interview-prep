@@ -80,7 +80,7 @@ const AISA = {
       mc("You are building an AI shopping assistant and the client's top concern is that it must never recommend products that do not exist in their catalog. What design pattern most reliably prevents this?",
         ["Let it free-generate SKUs", "Ground responses in the live catalog via retrieval/tools", "Ignore inventory", "Hard-code 10 products"], 1,
         "Grounding in a live product catalog via retrieval/tools prevents the assistant from inventing products or prices."),
-      mc("A retailer's product search is returning poor results for natural language queries like "comfortable summer dress for a beach wedding." What is the most impactful technique to improve semantic search quality?",
+      mc("A retailer's product search is returning poor results for natural language queries like 'comfortable summer dress for a beach wedding.' What is the most impactful technique to improve semantic search quality?",
         ["Exact keyword match only", "Embedding-based retrieval with reranking, blended with business signals", "Random ordering", "Alphabetical only"], 1,
         "Embedding retrieval plus reranking and business signals captures intent far better than keyword matching alone."),
       mc("You are generating product descriptions for 500,000 SKUs using an LLM. The client needs consistent quality across all outputs. What is your quality control strategy at this scale?",
@@ -243,7 +243,7 @@ const FDPM = {
       "How do you drive adoption of new tooling across a retailer's merchandising and ops teams?",
     ],
     mc: [
-      mc("A retail customer has given you a broad mandate: "help us grow." They have not given you specific requirements. How do you translate this vague goal into a focused product scope?",
+      mc("A retail customer has given you a broad mandate: 'help us grow.' They have not given you specific requirements. How do you translate this vague goal into a focused product scope?",
         ["Vanity metrics", "Conversion/funnel metrics tied to revenue", "Page views only", "Internal opinions"], 1,
         "Revenue-linked conversion and funnel metrics keep product priorities aligned to the retailer's growth goals."),
       mc("It is three months before peak season and a retailer is asking you to add features to the AI system at the expense of technical debt that is already causing instability. How do you approach this?",
