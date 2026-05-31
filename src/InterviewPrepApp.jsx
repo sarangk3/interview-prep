@@ -66,6 +66,52 @@ const ROLE_CFG = {
   'Technical Program Manager':        {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'Tech PM', card:'Tech Program Manager', interviewer:'Marcus Webb', interviewerTitle:'Senior Technical Program Manager'},
 };
 
+// Unique interviewer per company + role so names never repeat across sessions
+const COMPANY_INTERVIEWERS = {
+  Anthropic: {
+    'AI Solutions Architect':           { name: 'Alex Chen',       title: 'Principal Solutions Architect' },
+    'Forward Deployed Engineer':        { name: 'Jordan Rivera',   title: 'Senior Forward Deployed Engineer' },
+    'Forward Deployed Product Manager': { name: 'Priya Nair',      title: 'Forward Deployed Product Manager' },
+    'Technical Program Manager':        { name: 'Marcus Webb',     title: 'Senior Technical Program Manager' },
+  },
+  OpenAI: {
+    'AI Solutions Architect':           { name: 'Sarah Kim',       title: 'Senior Solutions Architect' },
+    'Forward Deployed Engineer':        { name: 'David Park',      title: 'Forward Deployed Engineer' },
+    'Forward Deployed Product Manager': { name: 'Maya Rodriguez',  title: 'Product Manager, Enterprise' },
+    'Technical Program Manager':        { name: 'James Liu',       title: 'Technical Program Manager' },
+  },
+  Google: {
+    'AI Solutions Architect':           { name: 'Aisha Johnson',   title: 'Principal Cloud AI Architect' },
+    'Forward Deployed Engineer':        { name: 'Connor Walsh',    title: 'Staff Engineer, Customer Engineering' },
+    'Forward Deployed Product Manager': { name: 'Nina Patel',      title: 'Senior Product Manager' },
+    'Technical Program Manager':        { name: 'Raj Mehta',       title: 'Technical Program Manager' },
+  },
+  Meta: {
+    'AI Solutions Architect':           { name: 'Lena Schmidt',    title: 'AI Solutions Architect' },
+    'Forward Deployed Engineer':        { name: 'Tyler Brooks',    title: 'Forward Deployed Engineer' },
+    'Forward Deployed Product Manager': { name: 'Camille Dubois',  title: 'Product Manager, AI Platform' },
+    'Technical Program Manager':        { name: 'Andre Williams',  title: 'Technical Program Manager' },
+  },
+  Microsoft: {
+    'AI Solutions Architect':           { name: 'Emma Larsson',    title: 'Principal Cloud Solutions Architect' },
+    'Forward Deployed Engineer':        { name: 'Kevin O\'Brien',  title: 'Senior Implementation Engineer' },
+    'Forward Deployed Product Manager': { name: 'Fatima Al-Hassan', title: 'Senior Product Manager, Copilot' },
+    'Technical Program Manager':        { name: 'Daniel Kim',      title: 'Senior Technical Program Manager' },
+  },
+  Amazon: {
+    'AI Solutions Architect':           { name: 'Mike Torres',     title: 'Senior Solutions Architect, AWS AI' },
+    'Forward Deployed Engineer':        { name: 'Rachel Chen',     title: 'Forward Deployed Engineer' },
+    'Forward Deployed Product Manager': { name: 'James Carter',    title: 'Senior Product Manager, Enterprise' },
+    'Technical Program Manager':        { name: 'Samira Okonkwo',  title: 'Senior Technical Program Manager' },
+  },
+  Nvidia: {
+    'AI Solutions Architect':           { name: 'Kenji Tanaka',    title: 'Senior Solutions Architect' },
+    'Forward Deployed Engineer':        { name: 'Olivia Park',     title: 'Forward Deployed Engineer' },
+    'Forward Deployed Product Manager': { name: 'Lucas Fernandez', title: 'Product Manager, AI Platform' },
+    'Technical Program Manager':        { name: 'Claire Thompson', title: 'Senior Technical Program Manager' },
+  },
+};
+
 /* Pick a question not recently shown, cycles through all before repeating */
 const getNextQuestion = (bank, key) => {
   const used = JSON.parse(localStorage.getItem(`q_${key}`) || '[]');
@@ -548,8 +594,9 @@ export default function InterviewPrepApp() {
       const newUsed = available.length > 1 ? [...used, idx] : [idx];
       localStorage.setItem(storageKey, JSON.stringify(newUsed));
       const prob = allProblems[idx];
-      const interviewerName = ROLE_CFG[r]?.interviewer || 'Your Interviewer';
-      const interviewerTitle = ROLE_CFG[r]?.interviewerTitle || r;
+      const interviewer = COMPANY_INTERVIEWERS?.[company]?.[r] || { name: ROLE_CFG[r]?.interviewer || 'Your Interviewer', title: ROLE_CFG[r]?.interviewerTitle || r };
+      const interviewerName = interviewer.name;
+      const interviewerTitle = interviewer.title;
       const greeting = userName ? `Hi ${userName}, ` : 'Hi, ';
       const openingMsg = `${greeting}I'm ${interviewerName}, ${interviewerTitle}. Thanks for taking the time to interview today.\n\n${prob.problem}`;
       setOpeningProblem(prob.problem);
