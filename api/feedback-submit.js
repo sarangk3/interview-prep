@@ -9,6 +9,9 @@ export default async function handler(req, res) {
 
   if (!token || !baseId) return res.status(500).json({ error: 'Airtable not configured' });
 
+  const now = new Date();
+  const timestamp = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' });
+
   try {
     const response = await fetch(`https://api.airtable.com/v0/${baseId}/Feedback`, {
       method: 'POST',
@@ -23,16 +26,17 @@ export default async function handler(req, res) {
             Message:   message.trim(),
             Email:     email?.trim() || '',
             Page:      page || '',
-            Timestamp: new Date().toISOString(),
+            Timestamp: timestamp,
           },
         }],
       }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const err = await response.json();
-      console.error('Airtable feedback error:', err);
-      return res.status(500).json({ error: 'Could not save feedback' });
+      console.error('Airtable feedback error:', JSON.stringify(data));
+      return res.status(500).json({ error: data?.error?.message || 'Could not save feedback' });
     }
 
     return res.status(200).json({ success: true });
