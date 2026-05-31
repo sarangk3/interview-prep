@@ -392,25 +392,36 @@ export default function InterviewPrepApp() {
 
   const MOCK_TURNS = 5;
 
-  const speakText = (text) => {
-    if (!ttsEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    // Strip markdown-like patterns for cleaner speech
-    const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/#{1,3} /g,'').replace(/\n+/g,' ');
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate = 0.95;
-    utt.pitch = 1;
-    // Prefer a natural voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v => v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Karen') || v.lang === 'en-US');
-    if (preferred) utt.voice = preferred;
-    utt.onstart = () => setTtsPlaying(true);
-    utt.onend = () => setTtsPlaying(false);
-    utt.onerror = () => setTtsPlaying(false);
-    window.speechSynthesis.speak(utt);
+  const speakText = async (text) => {
+    if (!ttsEnabled) return;
+    stopSpeech();
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, role }),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onplay = () => setTtsPlaying(true);
+      audio.onended = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
+      // Store ref so we can stop it
+      window._ttsAudio = audio;
+      await audio.play();
+    } catch(e) { setTtsPlaying(false); }
   };
 
-  const stopSpeech = () => { window.speechSynthesis?.cancel(); setTtsPlaying(false); };
+  const stopSpeech = () => {
+    if (window._ttsAudio) {
+      window._ttsAudio.pause();
+      window._ttsAudio.currentTime = 0;
+      window._ttsAudio = null;
+    }
+    setTtsPlaying(false);
+  };
 
   const startInterview=(r,m)=>{
     // Gate: free trial used up
