@@ -142,7 +142,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
       <div style={{padding:'14px 0',flex:1}}>
         <p style={{fontSize:11,fontWeight:600,color:'#9CA3AF',padding:'0 12px',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>Practice</p>
         {[{id:'roles',label:'Role Guides',icon:''},{id:'home',label:'Question Bank',icon:''},{id:'dashboard',label:'My Progress',icon:''}].map(item=>(
-          <button key={item.id} className={`ni ${page===item.id?'on':''}`} onClick={()=>setPage(item.id)}>
+          <button key={item.id} className={`ni ${page===item.id?'on':''}`} onClick={()=>navigate(item.id)}>
             {item.label}
           </button>
         ))}
@@ -166,7 +166,7 @@ const Sidebar = ({ page, setPage, interviews, user, onLogout, onSignIn, isPro, o
             <button onClick={onLogout} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'#DC2626',fontWeight:500,padding:0}}>Sign out</button>
           </div>
         ) : (
-          <button onClick={()=>onSignIn()} style={{width:'100%',marginBottom:10,padding:'10px 12px',background:'#EEF2FF',border:'1px solid #C7D2FE',borderRadius:10,cursor:'pointer',fontSize:13,fontWeight:600,color:'#4F46E5',textAlign:'left'}}>
+          <button onClick={onSignIn} style={{width:'100%',marginBottom:10,padding:'10px 12px',background:'#EEF2FF',border:'1px solid #C7D2FE',borderRadius:10,cursor:'pointer',fontSize:13,fontWeight:600,color:'#4F46E5',textAlign:'left'}}>
             Sign in or Create account
           </button>
         )}
@@ -257,6 +257,7 @@ export default function InterviewPrepApp() {
           window.history.replaceState({}, '', '/'); // clean URL
         }
       }
+      window.history.replaceState({ page: 'roles' }, '', '/');
       setAuthLoading(false);
     });
     const { data:{ subscription } } = supabase.auth.onAuthStateChange((_evt, session)=>{
@@ -331,7 +332,23 @@ export default function InterviewPrepApp() {
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
   const wc=response.trim().split(/\s+/).filter(Boolean).length;
 
-  const isPro = profile?.is_pro && (!profile?.pro_expires_at || new Date(profile.pro_expires_at) > new Date());
+  // Browser history-aware navigation
+  const navigate = (newPage) => {
+    window.history.pushState({ page: newPage }, '', '/');
+    setPage(newPage);
+    setSelectedRole(null);
+  };
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePop = (e) => {
+      const p = e.state?.page || 'roles';
+      setPage(p);
+      setSelectedRole(null);
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, []);
 
   const startUpgrade = async (priceId) => {
     if (!user) { setPage('signin'); setShowUpgrade(false); return; }
@@ -396,6 +413,7 @@ export default function InterviewPrepApp() {
       setQIndex(0);setSessionQs(qs);
       setSessionMeta({role:r,mode:m,format,industry,sessionId:Math.random().toString(36).slice(2)});
     }
+    window.history.pushState({ page: 'interview' }, '', '/');
     setPage('interview');
   };
 
@@ -486,8 +504,8 @@ export default function InterviewPrepApp() {
     const score=fmt2==='mc'?Math.round((responses.filter(r=>r.isCorrect).length/responses.length)*10):Math.round(responses.reduce((s,r)=>s+r.feedback.overall,0)/responses.length);
     const iv={role,mode,format:fmt2,industry,date:new Date().toISOString(),score,responses};
     setResults(responses);
-    if(user){ saveInterview(iv); setPage('results'); }
-    else { setPendingInterview(iv); setPage('results-gate'); }
+    if(user){ saveInterview(iv); window.history.pushState({ page: 'results' }, '', '/'); setPage('results'); }
+    else { setPendingInterview(iv); window.history.pushState({ page: 'results-gate' }, '', '/'); setPage('results-gate'); }
   };
 
   const buildTranscript=()=>{
@@ -635,7 +653,7 @@ export default function InterviewPrepApp() {
         </div>
       )}
       <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
-        <Sidebar page={page} setPage={p=>{setPage(p);setSelectedRole(null);}} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}}/>
+        <Sidebar page={page} setPage={navigate} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');navigate('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}}/>
 
         {/* ── Mobile header (top bar) ── */}
         {page!=='interview' && (
@@ -692,10 +710,10 @@ export default function InterviewPrepApp() {
                 <>
                   <p style={{fontSize:16,fontWeight:600,color:'#111827',marginBottom:6}}>Sign in or create account</p>
                   <p style={{fontSize:13,color:'#6B7280',marginBottom:20}}>Save your results and track your progress over time.</p>
-                  <button className="bp" onClick={()=>{setShowProfileSheet(false);setAuthMode('signup');setAuthError('');setPage('signin');}} style={{width:'100%',padding:'12px',fontSize:15,marginBottom:10}}>
+                  <button className="bp" onClick={()=>{setShowProfileSheet(false);setAuthMode('signup');setAuthError('');navigate('signin');}} style={{width:'100%',padding:'12px',fontSize:15,marginBottom:10}}>
                     Create free account →
                   </button>
-                  <button className="bg" onClick={()=>{setShowProfileSheet(false);setAuthMode('login');setAuthError('');setPage('signin');}} style={{width:'100%',padding:'12px',fontSize:15}}>
+                  <button className="bg" onClick={()=>{setShowProfileSheet(false);setAuthMode('login');setAuthError('');navigate('signin');}} style={{width:'100%',padding:'12px',fontSize:15}}>
                     Sign in
                   </button>
                 </>
@@ -712,7 +730,7 @@ export default function InterviewPrepApp() {
               {id:'home',label:'Practice',icon:<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>},
               {id:'dashboard',label:'Progress',icon:<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>},
             ].map(tab=>(
-              <button key={tab.id} className={`mob-tab ${page===tab.id?'on':''}`} onClick={()=>{setPage(tab.id);setSelectedRole(null);}}>
+              <button key={tab.id} className={`mob-tab ${page===tab.id?'on':''}`} onClick={()=>navigate(tab.id)}>
                 {tab.icon}
                 {tab.label}
               </button>
@@ -730,7 +748,7 @@ export default function InterviewPrepApp() {
                   <p style={{color:'#9CA3AF',fontSize:14}}>Sign in or create an account to track your progress.</p>
                 </div>
                 {renderAuthForm(()=>setPage('home'))}
-                <button onClick={()=>setPage('home')} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:14,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
+                <button onClick={()=>navigate('home')} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:14,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
                   ← Continue without signing in
                 </button>
               </div>
@@ -743,7 +761,7 @@ export default function InterviewPrepApp() {
               {/* Header */}
               <div style={{background:'#fff',borderBottom:'1px solid #E5E7EB',padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                  <button className="bg" onClick={()=>setPage('home')} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
+                  <button className="bg" onClick={()=>navigate('home')} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
                   {role&&ROLE_CFG[role]&&<div style={{padding:'3px 10px',borderRadius:20,background:ROLE_CFG[role].bg,border:`1px solid ${ROLE_CFG[role].border}`,fontSize:12,fontWeight:600,color:ROLE_CFG[role].color}}>{role}</div>}
                   <div style={{padding:'3px 10px',borderRadius:20,background:'#F9FAFB',border:'1px solid #E5E7EB',fontSize:12,color:'#6B7280'}}>{industry}</div>
 
@@ -812,7 +830,7 @@ export default function InterviewPrepApp() {
               {/* Left, question (stable, no key that changes) */}
               <div style={{flex:1,padding:'28px 32px',overflowY:'auto',borderRight:'1px solid #E5E7EB',background:'#F9FAFB'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:18,flexWrap:'wrap'}}>
-                  <button className="bg" onClick={()=>setPage('home')} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
+                  <button className="bg" onClick={()=>navigate('home')} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
                   <div style={{padding:'3px 10px',borderRadius:20,background:cfg.bg,border:`1px solid ${cfg.border}`,fontSize:12,fontWeight:600,color:cfg.color}}>{role}</div>
                   <div style={{padding:'3px 10px',borderRadius:20,background:'#F9FAFB',border:'1px solid #E5E7EB',fontSize:12,color:'#6B7280'}}>{industry}</div>
                   <span style={{fontSize:12,color:'#9CA3AF',marginLeft:'auto'}}>Q{qIndex+1} of {sessionQs.length}</span>
@@ -1111,7 +1129,7 @@ export default function InterviewPrepApp() {
                           </div>
                         )}
                         {/* CTA */}
-                        <button className="bp" onClick={()=>{setSelectedRole(null);setPage('home');}} style={{padding:'13px 28px',fontSize:15}}>
+                        <button className="bp" onClick={()=>{setSelectedRole(null);navigate('home');}} style={{padding:'13px 28px',fontSize:15}}>
                           Practice {selected.key} interviews →
                         </button>
                       </div>
@@ -1141,7 +1159,7 @@ export default function InterviewPrepApp() {
                     ))}
                   </div>
                   {renderAuthForm(null)}
-                  <button onClick={()=>setPage('home')} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:14,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
+                  <button onClick={()=>navigate('home')} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:14,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
                     Skip for now, practice another question
                   </button>
                 </div>
@@ -1224,7 +1242,7 @@ export default function InterviewPrepApp() {
                   <div className="mp" style={{maxWidth:760,margin:'0 auto',padding:'36px 32px'}}>
                     <div className="fu" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:24,flexWrap:'wrap',gap:16}}>
                       <div>
-                        <button className="bg" onClick={()=>setPage('home')} style={{padding:'5px 12px',fontSize:13,marginBottom:12}}>← Home</button>
+                        <button className="bg" onClick={()=>navigate('home')} style={{padding:'5px 12px',fontSize:13,marginBottom:12}}>← Home</button>
                         <h1 style={{fontSize:22,fontWeight:700,color:'#111827',marginBottom:8}}>Mock Interview Feedback</h1>
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                           {cfgR&&<span style={{fontSize:12,background:cfgR.bg,border:`1px solid ${cfgR.border}`,color:cfgR.color,padding:'3px 10px',borderRadius:20,fontWeight:600}}>{role}</span>}
@@ -1316,7 +1334,7 @@ export default function InterviewPrepApp() {
                     </div>
                     <div style={{display:'flex',gap:10}}>
                       <button className="bp" onClick={()=>startInterview(role,'full')} style={{flex:1,padding:'13px',fontSize:14}}>Try Again</button>
-                      <button className="bg" onClick={()=>setPage('home')} style={{flex:1,padding:'13px',fontSize:14}}>Choose Another Role</button>
+                      <button className="bg" onClick={()=>navigate('home')} style={{flex:1,padding:'13px',fontSize:14}}>Choose Another Role</button>
                     </div>
                   </div>
                 );
@@ -1333,7 +1351,7 @@ export default function InterviewPrepApp() {
                   <div className="mp" style={{maxWidth:760,margin:'0 auto',padding:'36px 32px'}}>
                     <div className="fu" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:24,flexWrap:'wrap',gap:16}}>
                       <div>
-                        <button className="bg" onClick={()=>setPage('home')} style={{padding:'5px 12px',fontSize:13,marginBottom:12}}>← Home</button>
+                        <button className="bg" onClick={()=>navigate('home')} style={{padding:'5px 12px',fontSize:13,marginBottom:12}}>← Home</button>
                         <h1 style={{fontSize:22,fontWeight:700,color:'#111827',marginBottom:8}}>Interview Feedback</h1>
                         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                           {cfgR&&<span style={{fontSize:12,background:cfgR.bg,border:`1px solid ${cfgR.border}`,color:cfgR.color,padding:'3px 10px',borderRadius:20,fontWeight:600}}>{role}</span>}
@@ -1433,7 +1451,7 @@ export default function InterviewPrepApp() {
                     </div>
                     <div style={{display:'flex',gap:10}}>
                       <button className="bp" onClick={()=>startInterview(role,mode)} style={{flex:1,padding:'13px',fontSize:14}}>Retry {role?.split(' ')[0]}</button>
-                      <button className="bg" onClick={()=>setPage('home')} style={{flex:1,padding:'13px',fontSize:14}}>Choose Another Role</button>
+                      <button className="bg" onClick={()=>navigate('home')} style={{flex:1,padding:'13px',fontSize:14}}>Choose Another Role</button>
                     </div>
                   </div>
                 );
@@ -1465,7 +1483,7 @@ export default function InterviewPrepApp() {
                             <p style={{fontSize:40,marginBottom:16}}></p>
                             <p style={{fontSize:18,fontWeight:600,color:'#374151',marginBottom:8}}>Sign in to track your progress</p>
                             <p style={{color:'#9CA3AF',marginBottom:24,fontSize:14}}>Create a free account to save your history and see your score trends.</p>
-                            <button className="bp" onClick={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} style={{padding:'12px 28px',fontSize:15}}>Create free account →</button>
+                            <button className="bp" onClick={()=>{setAuthMode('signup');setAuthError('');navigate('signin');}} style={{padding:'12px 28px',fontSize:15}}>Create free account →</button>
                           </>
                         ) : (
                           <>
@@ -1473,7 +1491,7 @@ export default function InterviewPrepApp() {
                             <p style={{fontSize:18,fontWeight:600,color:'#374151',marginBottom:8}}>No sessions yet</p>
                             <p style={{color:'#9CA3AF',marginBottom:8,fontSize:14}}>Complete your first interview to start tracking your progress.</p>
                             <p style={{color:'#D1D5DB',marginBottom:24,fontSize:13}}>You'll see your score trends, practice breakdown by role, and session history here.</p>
-                            <button className="bp" onClick={()=>setPage('home')} style={{padding:'12px 28px',fontSize:15}}>Start Practicing</button>
+                            <button className="bp" onClick={()=>navigate('home')} style={{padding:'12px 28px',fontSize:15}}>Start Practicing</button>
                           </>
                         )}
                       </div>
