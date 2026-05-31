@@ -201,6 +201,8 @@ export default function InterviewPrepApp() {
   const [selectedRole,setSelectedRole] = useState(null);
   const [showProfileSheet,setShowProfileSheet] = useState(false);
   const [activeTab,setActiveTab] = useState('role');
+  const [mockAuthGate,setMockAuthGate] = useState(false);    // shows after mock turn 1
+  const [writtenAuthGate,setWrittenAuthGate] = useState(false); // shows after written Q1
   const [mockMessages,setMockMessages]   = useState([]);
   const [mockTurnCount,setMockTurnCount] = useState(0);
   const [mockThinking,setMockThinking]   = useState(false);
@@ -420,6 +422,8 @@ export default function InterviewPrepApp() {
       setQIndex(0);setSessionQs(qs);
       setSessionMeta({role:r,mode:m,format,industry,sessionId:Math.random().toString(36).slice(2)});
     }
+    setMockAuthGate(false);
+    setWrittenAuthGate(false);
     setPage('interview');
   };
 
@@ -445,6 +449,8 @@ export default function InterviewPrepApp() {
       const withReply=[...updatedMessages,{role:'interviewer',content:data.reply}];
       setMockMessages(withReply);
       setMockTurnCount(newTurn);
+      // After turn 1, gate anonymous users — let them read the first reply then prompt
+      if (newTurn === 1 && !user) { setMockAuthGate(true); }
       // Scoring is triggered manually via the "See my results" button
       // so the user can read the final debrief before leaving
     }catch(err){setErrorMsg(typeof err==='string'?err:(err?.message||'Error. Please try again.'));}
@@ -476,7 +482,11 @@ export default function InterviewPrepApp() {
       catch{fb={technical_depth:5,communication_clarity:5,structure:5,approach:5,overall:5,strengths:['Some relevant points'],improvements:['Add more specifics','Use a framework'],feedback:'Needs more depth.',key_points:['Use a clear framework','Cover trade-offs','Concrete examples']};}
       const next=[...allResponses,{question:q,answer:response,feedback:fb}];
       setAllResponses(next);
-      if(qIndex+1<sessionQs.length){setQIndex(qIndex+1);setResponse('');}
+      if(qIndex+1<sessionQs.length){
+        // After Q1, gate anonymous users before continuing to Q2
+        if(qIndex===0 && !user){ setWrittenAuthGate(true); setQIndex(qIndex+1); setResponse(''); }
+        else { setQIndex(qIndex+1); setResponse(''); }
+      }
       else finishInterview(next,'text');
     }catch(err){setErrorMsg((typeof err==='string'?err:err?.message)||'Error getting feedback. Try Multiple Choice mode which works offline.');}
     finally{setSubmitting(false);}
@@ -492,17 +502,28 @@ export default function InterviewPrepApp() {
     else finishInterview(next,'mc');
   };
 
-  // Free trial tracking
+  // Free trial tracking — localStorage for anonymous, Supabase for logged-in
   const FREE_KEYS = { text: 'free_written_done', mock: 'free_mock_done' };
   const hasFreeTrialLeft = (fmt) => {
     if (isPro) return true;
-    if (fmt === 'mc') return true; // MC always free
+    if (fmt === 'mc') return true;
+    if (user) {
+      // Server-side check for logged-in users
+      if (fmt === 'mock') return !profile?.free_mock_done;
+      return !profile?.free_written_done;
+    }
     return !localStorage.getItem(FREE_KEYS[fmt] || FREE_KEYS.text);
   };
-  const markFreeTrialUsed = (fmt) => {
+  const markFreeTrialUsed = async (fmt) => {
     if (fmt === 'mc' || isPro) return;
     const key = FREE_KEYS[fmt] || FREE_KEYS.text;
-    localStorage.setItem(key, '1');
+    localStorage.setItem(key, '1'); // always set localStorage
+    if (user) {
+      // Also mark server-side for logged-in users
+      const field = fmt === 'mock' ? 'free_mock_done' : 'free_written_done';
+      await supabase.from('profiles').upsert({ id: user.id, [field]: true }, { onConflict: 'id' });
+      setProfile(p => ({ ...p, [field]: true }));
+    }
   };
 
   const finishInterview=(responses,fmt2)=>{
@@ -676,6 +697,56 @@ export default function InterviewPrepApp() {
           </div>
         </div>
       )}
+      {/* ── Mock interview auth gate (after turn 1) ── */}
+      {mockAuthGate && (
+        <div style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+          <div style={{background:'#fff',borderRadius:20,padding:36,maxWidth:420,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,0.25)'}}>
+            <div style={{textAlign:'center',marginBottom:24}}>
+              <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#6366F1,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,margin:'0 auto 16px',color:'#fff',fontWeight:700}}>1</div>
+              <h2 style={{fontSize:20,fontWeight:700,color:'#111827',marginBottom:8}}>You completed round 1</h2>
+              <p style={{color:'#6B7280',fontSize:14,lineHeight:1.6}}>Create a free account to continue your mock interview. Your progress is saved.</p>
+            </div>
+            <div style={{background:'#F5F3FF',borderRadius:10,padding:'12px 16px',marginBottom:20}}>
+              {['Continue to rounds 2-5','Get full AI feedback and scoring at the end','Save your session history'].map((b,i)=>(
+                <div key={i} style={{display:'flex',gap:8,marginBottom:i<2?6:0}}>
+                  <span style={{color:'#7C3AED',fontWeight:700,flexShrink:0}}>✓</span>
+                  <span style={{fontSize:13,color:'#4C1D95'}}>{b}</span>
+                </div>
+              ))}
+            </div>
+            {renderAuthForm(()=>setMockAuthGate(false))}
+            <button onClick={()=>{setMockAuthGate(false);setConfirmExit(true);}} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:12,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
+              Exit interview
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Written response auth gate (after Q1) ── */}
+      {writtenAuthGate && (
+        <div style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+          <div style={{background:'#fff',borderRadius:20,padding:36,maxWidth:420,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,0.25)'}}>
+            <div style={{textAlign:'center',marginBottom:24}}>
+              <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#6366F1,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,margin:'0 auto 16px',color:'#fff',fontWeight:700}}>1</div>
+              <h2 style={{fontSize:20,fontWeight:700,color:'#111827',marginBottom:8}}>Question 1 complete</h2>
+              <p style={{color:'#6B7280',fontSize:14,lineHeight:1.6}}>Create a free account to continue to questions 2-5 and see your full results.</p>
+            </div>
+            <div style={{background:'#F5F3FF',borderRadius:10,padding:'12px 16px',marginBottom:20}}>
+              {['Continue to all 5 questions','See full score breakdown and feedback','Save your session history'].map((b,i)=>(
+                <div key={i} style={{display:'flex',gap:8,marginBottom:i<2?6:0}}>
+                  <span style={{color:'#7C3AED',fontWeight:700,flexShrink:0}}>✓</span>
+                  <span style={{fontSize:13,color:'#4C1D95'}}>{b}</span>
+                </div>
+              ))}
+            </div>
+            {renderAuthForm(()=>setWrittenAuthGate(false))}
+            <button onClick={()=>{setWrittenAuthGate(false);setConfirmExit(true);}} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:12,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
+              Exit interview
+            </button>
+          </div>
+        </div>
+      )}
+
       {confirmExit && (
         <div style={{position:'fixed',inset:0,zIndex:999,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
           <div style={{background:'#fff',borderRadius:16,padding:32,maxWidth:380,width:'100%',boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
