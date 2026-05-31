@@ -210,9 +210,8 @@ export default function InterviewPrepApp() {
   const [feedbackEmail,setFeedbackEmail]   = useState('');
   const [feedbackSent,setFeedbackSent]     = useState(false);
   const [feedbackWorking,setFeedbackWorking] = useState(false);
-  const [mockAuthGate,setMockAuthGate]     = useState(false);
+  const [mockAuthGate,setMockAuthGate]       = useState(false);
   const [writtenAuthGate,setWrittenAuthGate] = useState(false);
-  const [writtenAuthGate,setWrittenAuthGate] = useState(false); // shows after written Q1
   const [mockMessages,setMockMessages]   = useState([]);
   const [mockTurnCount,setMockTurnCount] = useState(0);
   const [mockThinking,setMockThinking]   = useState(false);
