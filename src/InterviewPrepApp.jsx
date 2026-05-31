@@ -1496,15 +1496,6 @@ export default function InterviewPrepApp() {
                             ))}
                           </div>
                         </div>
-                        {/* Sources */}
-                        {selected.sources?.length>0&&(
-                          <div style={{padding:'14px 16px',marginBottom:24,background:'#F9FAFB',borderRadius:10,border:'1px solid #F3F4F6'}}>
-                            <p style={{fontSize:11,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Sources</p>
-                            {selected.sources.map((src,i)=>(
-                              <p key={i} style={{fontSize:12,color:'#9CA3AF',marginBottom:2}}>· {src}</p>
-                            ))}
-                          </div>
-                        )}
                         {/* CTA */}
                         <button className="bp" onClick={()=>{setSelectedRole(null);setPage('home');}} style={{padding:'13px 28px',fontSize:15}}>
                           Practice {selected.key} interviews →
