@@ -1487,7 +1487,7 @@ export default function InterviewPrepApp() {
                         </div>
                         <div className="rg" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:16}}>
                           {ROLE_ARTICLES.map(r=>(
-                            <div key={r.key} className="rc" onClick={()=>setSelectedRole(r.key)} style={{padding:'24px'}}>
+                            <div key={r.key} className="rc" onClick={()=>{setSelectedRole(r.key);setActiveTab('role');}} style={{padding:'24px'}}>
                               <div style={{display:'flex',alignItems:'flex-start',gap:14,marginBottom:14}}>
                                 
                                 <div>
@@ -1495,17 +1495,22 @@ export default function InterviewPrepApp() {
                                   <p style={{fontSize:12,color:r.cfg.color,fontWeight:600}}>{r.cfg.label}</p>
                                 </div>
                               </div>
-                              <p style={{fontSize:13,color:'#6B7280',lineHeight:1.6,marginBottom:12}}>{r.what.substring(0,140)}…</p>
-                            <div style={{display:'flex',gap:6,marginBottom:14}}>
-                              <span style={{fontSize:11,background:'#EEF2FF',color:'#4F46E5',padding:'2px 8px',borderRadius:10,fontWeight:500}}>Role overview</span>
-                              <span style={{fontSize:11,background:'#F0FDF4',color:'#059669',padding:'2px 8px',borderRadius:10,fontWeight:500}}>Interview guide</span>
-                            </div>
-                              <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:16}}>
+                              <p style={{fontSize:13,color:'#6B7280',lineHeight:1.6,marginBottom:14}}>{r.what.substring(0,140)}…</p>
+                              <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14}}>
                                 {r.companiesHiring.slice(0,4).map(c=>(
                                   <span key={c} style={{fontSize:11,background:'#F3F4F6',color:'#6B7280',padding:'2px 8px',borderRadius:10}}>{c}</span>
                                 ))}
                               </div>
-                              <span style={{fontSize:13,color:'#6366F1',fontWeight:600}}>Read the guide →</span>
+                              <div style={{display:'flex',gap:8}}>
+                                <button onClick={e=>{e.stopPropagation();setSelectedRole(r.key);setActiveTab('role');}}
+                                  style={{flex:1,padding:'8px 0',border:`1px solid ${r.cfg.border}`,borderRadius:8,background:r.cfg.bg,color:r.cfg.color,fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                                  Role overview →
+                                </button>
+                                <button onClick={e=>{e.stopPropagation();setSelectedRole(r.key);setActiveTab('interview');}}
+                                  style={{flex:1,padding:'8px 0',border:'1px solid #D1FAE5',borderRadius:8,background:'#F0FDF4',color:'#059669',fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                                  Interview guide →
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
