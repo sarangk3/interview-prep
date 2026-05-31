@@ -872,6 +872,37 @@ export default function InterviewPrepApp() {
                   </div>
                 </div>
               )}
+              {/* Finish button — shown after all rounds complete and not still thinking */}
+              {mockTurnCount>=(MOCK_TURNS)&&!mockThinking&&(
+                <div style={{background:'#fff',borderTop:'1px solid #E5E7EB',padding:'20px 24px',flexShrink:0}}>
+                  <div style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:12,padding:'16px 20px',marginBottom:16,textAlign:'center'}}>
+                    <p style={{fontSize:14,fontWeight:600,color:'#6D28D9',marginBottom:4}}>Interview complete</p>
+                    <p style={{fontSize:13,color:'#7C3AED'}}>All {MOCK_TURNS} rounds done. Get your score and detailed feedback.</p>
+                  </div>
+                  <button className="bp" onClick={async()=>{
+                    setMockThinking(true);
+                    try{
+                      const { data:{ session:msess } } = await supabase.auth.getSession();
+                      const mockHeaders={'Content-Type':'application/json',...(msess?.access_token?{'Authorization':`Bearer ${msess.access_token}`}:{})};
+                      const scoreRes=await fetch('/api/mock',{method:'POST',headers:mockHeaders,
+                        body:JSON.stringify({mode:'score',messages:mockMessages,role,industry,company,
+                          openingProblem,keyComponents:sessionMeta.keyComponents||[]})});
+                      const scoreData=await scoreRes.json();
+                      if(scoreRes.ok&&scoreData.score){
+                        setMockScore(scoreData.score);
+                        const iv={role,mode:'mock',format:'mock',industry,company,
+                          date:new Date().toISOString(),score:scoreData.score.overall,
+                          problemTitle:sessionMeta.problemTitle,messages:mockMessages,mockScore:scoreData.score};
+                        if(user){ saveInterview(iv); setPage('results'); }
+                        else { setPendingInterview(iv); setPage('results-gate'); }
+                      } else { setErrorMsg(scoreData.error||'Could not score interview. Please try again.'); }
+                    }catch(e){ setErrorMsg(e.message||'Error scoring interview.'); }
+                    finally{ setMockThinking(false); }
+                  }} style={{width:'100%',padding:'14px',fontSize:16,fontWeight:700}}>
+                    See my results →
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {page==='interview' && format!=='mock' && q && cfg && (
