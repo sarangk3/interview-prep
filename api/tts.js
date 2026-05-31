@@ -3,19 +3,34 @@
 //            Adam (pNInz6obpgDQGcFmaJgB) - confident, clear male
 //            Josh (TxGEqnHWrfWFTfGW9XjX) - friendly male
 
-const VOICE_MAP = {
-  'AI Solutions Architect':           'TxGEqnHWrfWFTfGW9XjX', // Josh - confident
-  'Forward Deployed Engineer':        'TxGEqnHWrfWFTfGW9XjX', // Josh
-  'Forward Deployed Product Manager': '21m00Tcm4TlvDq8ikWAM', // Rachel - warm
-  'Technical Program Manager':        'pNInz6obpgDQGcFmaJgB', // Adam - authoritative
+// User's own ElevenLabs voices (free tier compatible)
+const VOICES = [
+  's3TPKV1kjDlVtZbl4Ksh',
+  'NDTYOmYEjbDIVCKB35i3',
+  '8Ln42OXYupYsag45MAUy',
+  'QTGiyJvep6bcx4WD1qAq',
+  'bbGtsRRKUfYO634UxSjz',
+  'vZzlAds9NzvLsFSWp0qk',
+];
+
+// Assign voices by role — consistent per role, varies by company
+const ROLE_VOICE = {
+  'AI Solutions Architect':           VOICES[0],
+  'Forward Deployed Engineer':        VOICES[1],
+  'Forward Deployed Product Manager': VOICES[2],
+  'Technical Program Manager':        VOICES[3],
 };
 
-const DEFAULT_VOICE = 'TxGEqnHWrfWFTfGW9XjX';
+const COMPANY_VOICE_OFFSET = {
+  Anthropic: 0, OpenAI: 1, Google: 2, Meta: 3, Microsoft: 4, Amazon: 5, Nvidia: 0,
+};
+
+const DEFAULT_VOICE = VOICES[0];
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { text, role } = req.body;
+  const { text, role, company } = req.body;
   if (!text?.trim()) return res.status(400).json({ error: 'No text provided' });
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -23,9 +38,12 @@ export default async function handler(req, res) {
     console.error('ELEVENLABS_API_KEY not set');
     return res.status(500).json({ error: 'ElevenLabs not configured' });
   }
-  console.log(`TTS: role=${role}, voice=${VOICE_MAP[role]||DEFAULT_VOICE}, chars=${text?.length}`);
 
-  const voiceId = VOICE_MAP[role] || DEFAULT_VOICE;
+  const baseVoice = ROLE_VOICE[role] || DEFAULT_VOICE;
+  const offset = COMPANY_VOICE_OFFSET[company] || 0;
+  const baseIdx = VOICES.indexOf(baseVoice);
+  const voiceId = VOICES[(baseIdx + offset) % VOICES.length];
+  console.log(`TTS: role=${role}, company=${company}, voice=${voiceId}, chars=${text?.length}`);
 
   try {
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {

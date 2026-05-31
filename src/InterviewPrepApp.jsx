@@ -456,7 +456,7 @@ export default function InterviewPrepApp() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, role: speakRole }),
+        body: JSON.stringify({ text, role: speakRole, company }),
       });
       if (res.ok && res.headers.get('content-type')?.includes('audio')) {
         const blob = await res.blob();
@@ -482,12 +482,22 @@ export default function InterviewPrepApp() {
     if (!window.speechSynthesis) return;
     const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/\n+/g,' ');
     const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate = 0.92; utt.pitch = 1.05;
+    utt.rate = 0.90;
+    utt.pitch = 1.0;
+    utt.volume = 1.0;
+
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v =>
-      v.name.includes('Samantha') || v.name.includes('Daniel') ||
-      v.name.includes('Google US') || (v.lang==='en-US' && v.localService)
-    );
+    // Priority order: best natural-sounding voices across platforms
+    const preferred = voices.find(v => v.name === 'Samantha')                    // Mac - best
+      || voices.find(v => v.name === 'Daniel')                                    // Mac UK - good
+      || voices.find(v => v.name === 'Karen')                                     // Mac AU
+      || voices.find(v => v.name.includes('Google US English'))                   // Chrome
+      || voices.find(v => v.name.includes('Google UK English Female'))            // Chrome UK
+      || voices.find(v => v.name.includes('Microsoft Aria'))                      // Windows - best
+      || voices.find(v => v.name.includes('Microsoft Jenny'))                     // Windows
+      || voices.find(v => v.lang === 'en-US' && v.localService && !v.name.includes('Compact'))
+      || voices.find(v => v.lang === 'en-US');
+
     if (preferred) utt.voice = preferred;
     utt.onstart = () => setTtsPlaying(true);
     utt.onend = () => setTtsPlaying(false);
