@@ -920,8 +920,8 @@ export default function InterviewPrepApp() {
                 <div style={{background:'#fff',borderTop:'1px solid #E5E7EB',padding:'16px 24px',flexShrink:0}}>
                   <div style={{position:'relative'}}>
                     <textarea value={response} onChange={e=>setResponse(e.target.value)}
-                      onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))submitMockResponse();}}
-                      placeholder="Type your response here... (Cmd+Enter to submit)"
+                      onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&response.trim().length>=5&&!mockThinking){e.preventDefault();submitMockResponse();}}}
+                      placeholder="Type your response here... (Enter to submit, Shift+Enter for new line)"
                       style={{width:'100%',minHeight:100,padding:'14px',paddingBottom:48,border:'1px solid #E5E7EB',borderRadius:12,fontSize:14,
                         lineHeight:1.6,color:'#111827',background:'#F9FAFB',display:'block',
                         borderColor:response.length>50?'#A5B4FC':'#E5E7EB',transition:'border-color .2s'}}/>
@@ -934,7 +934,7 @@ export default function InterviewPrepApp() {
                     )}
                   </div>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:10}}>
-                    <span style={{fontSize:12,color:'#D1D5DB'}}>{response.trim().split(/\s+/).filter(Boolean).length} words · Cmd+Enter to send</span>
+                    <span style={{fontSize:12,color:'#D1D5DB'}}>{response.trim().split(/\s+/).filter(Boolean).length} words · Enter to send</span>
                     <button className="bp" onClick={submitMockResponse} disabled={response.trim().length<5||mockThinking}
                       style={{padding:'10px 24px',fontSize:14}}>
                       Respond →
@@ -1033,7 +1033,8 @@ export default function InterviewPrepApp() {
                     </div>
                     <div style={{position:'relative',flex:1,display:'flex',flexDirection:'column'}}>
                       <textarea value={response} onChange={e=>setResponse(e.target.value)}
-                        placeholder="Walk through your approach here. Think out loud, how you structure your answer matters as much as the content..."
+                        onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&response.trim().length>=3&&!submitting){e.preventDefault();submitText();}}}
+                        placeholder="Walk through your approach here. Think out loud, how you structure your answer matters as much as the content... (Enter to submit, Shift+Enter for new line)"
                         style={{flex:1,minHeight:260,padding:'16px',paddingBottom:52,border:'1px solid #E5E7EB',borderRadius:12,fontSize:14,
                           lineHeight:1.7,color:'#111827',background:'#F9FAFB',transition:'border-color .2s',display:'block',width:'100%',
                           borderColor:listening?'#FCA5A5':response.length>100?'#A5B4FC':'#E5E7EB'}}
