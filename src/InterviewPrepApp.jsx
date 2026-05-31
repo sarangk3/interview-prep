@@ -403,38 +403,50 @@ export default function InterviewPrepApp() {
     if (!ttsEnabled) return;
     stopSpeech();
     const speakRole = roleOverride || role;
+
+    // Try ElevenLabs first
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, role: speakRole }),
       });
-      if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
-      const blob = await res.blob();
-      if (blob.size < 100) throw new Error('Empty audio response');
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onplay = () => setTtsPlaying(true);
-      audio.onended = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
-      window._ttsAudio = audio;
-      await audio.play();
-    } catch(e) {
-      console.warn('ElevenLabs TTS failed, falling back to browser TTS:', e.message);
-      // Browser TTS fallback
-      if (window.speechSynthesis) {
-        const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/\n+/g,' ');
-        const utt = new SpeechSynthesisUtterance(clean);
-        utt.rate = 0.92; utt.pitch = 1.05;
-        const voices = window.speechSynthesis.getVoices();
-        const preferred = voices.find(v => v.name.includes('Samantha') || v.name.includes('Daniel') || (v.lang==='en-US' && v.localService));
-        if (preferred) utt.voice = preferred;
-        utt.onstart = () => setTtsPlaying(true);
-        utt.onend = () => setTtsPlaying(false);
-        window.speechSynthesis.speak(utt);
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob.size > 100) {
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.onplay = () => setTtsPlaying(true);
+          audio.onended = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
+          audio.onerror = () => { setTtsPlaying(false); URL.revokeObjectURL(url); fallbackTTS(text); };
+          window._ttsAudio = audio;
+          await audio.play();
+          return;
+        }
       }
-      setTtsPlaying(false);
+    } catch(e) {
+      console.warn('ElevenLabs TTS unavailable:', e.message);
     }
+
+    // Browser TTS fallback
+    fallbackTTS(text);
+  };
+
+  const fallbackTTS = (text) => {
+    if (!window.speechSynthesis) return;
+    const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/\n+/g,' ');
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.rate = 0.92; utt.pitch = 1.05;
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v =>
+      v.name.includes('Samantha') || v.name.includes('Daniel') ||
+      v.name.includes('Google US') || (v.lang==='en-US' && v.localService)
+    );
+    if (preferred) utt.voice = preferred;
+    utt.onstart = () => setTtsPlaying(true);
+    utt.onend = () => setTtsPlaying(false);
+    utt.onerror = () => setTtsPlaying(false);
+    window.speechSynthesis.speak(utt);
   };
 
   const stopSpeech = () => {
