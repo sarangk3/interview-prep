@@ -442,22 +442,8 @@ export default function InterviewPrepApp() {
       const withReply=[...updatedMessages,{role:'interviewer',content:data.reply}];
       setMockMessages(withReply);
       setMockTurnCount(newTurn);
-
-      // If this was the final turn, get scores
-      if(newTurn>=maxTurns){
-        const scoreRes=await fetch('/api/mock',{method:'POST',headers:mockHeaders,
-          body:JSON.stringify({mode:'score',messages:withReply,role,industry,company,
-            openingProblem,keyComponents:sessionMeta.keyComponents||[]})});
-        const scoreData=await scoreRes.json();
-        if(scoreRes.ok&&scoreData.score){
-          setMockScore(scoreData.score);
-          const iv={role,mode:'mock',format:'mock',industry,company,
-            date:new Date().toISOString(),score:scoreData.score.overall,
-            problemTitle:sessionMeta.problemTitle,messages:withReply,mockScore:scoreData.score};
-          if(user){ saveInterview(iv); setPage('results'); }
-          else { setPendingInterview(iv); setPage('results-gate'); }
-        }
-      }
+      // Scoring is triggered manually via the "See my results" button
+      // so the user can read the final debrief before leaving
     }catch(err){setErrorMsg(typeof err==='string'?err:(err?.message||'Error. Please try again.'));}
     finally{setMockThinking(false);}
   };
