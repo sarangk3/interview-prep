@@ -875,3 +875,151 @@ export const COMPANY_PERSONAS = {
     nudgeStyle: 'Ask the candidate where the compute bottleneck is in their proposed solution and how they would profile and optimize it for GPU execution.',
   },
 };
+
+/* ── Company-specific mock interview opening problems ──────────────────────
+   Sourced from: Glassdoor, IGotAnOffer, Exponent, fde.academy (2025-2026)
+   These reflect actual question patterns reported by candidates.
+   ─────────────────────────────────────────────────────────────────────── */
+export const COMPANY_PROBLEMS = {
+
+  Anthropic: {
+    'AI Solutions Architect': {
+      problem: "A large hospital network wants to deploy Claude to help clinicians retrieve and summarize relevant patient history during consultations. The system must work within their existing Epic EHR environment, handle PHI, and respond in under two seconds. Walk me through how you would architect this, including how you would know whether it was actually working safely before rolling it out.",
+      keyComponents: ["PHI handling and HIPAA compliance — patient data cannot leave the hospital's VPC","RAG over structured Epic data using a secure, on-premise vector store","Retrieval latency optimization — chunking strategy and index design for sub-2-second p95","Evaluation framework: retrieval recall, hallucination rate, clinician trust metrics","Pilot design: which 20 clinicians, what success criteria, how long before expand-or-kill decision","Failure modes: what happens when retrieval returns nothing relevant, fallback behavior"],
+      hints: ["What does 'working safely' actually mean in a clinical context — what metrics would you track?","How do you prevent Claude from hallucinating a drug interaction that isn't in the retrieved context?","Walk me through what happens when a clinician asks something the system cannot answer reliably."],
+      idealSolution: "Hybrid RAG with on-premise vector store, PHI-safe pipeline, strong evals with RAGAS metrics, phased rollout with clinician feedback loop."
+    },
+    'Forward Deployed Engineer': {
+      problem: "Anthropic has a new enterprise customer — a legal services firm — that wants to use Claude to draft first-pass contract summaries from uploaded PDFs. They have 50,000 contracts in their archive, varied formats, and their legal team is deeply skeptical of AI output. Their IT team requires airgap deployment. You have four weeks. Where do you start, and what does week one look like?",
+      keyComponents: ["Discovery: understanding which contract types matter most and what the lawyers actually need","Airgap deployment constraints — no API calls to external services, on-premise model serving","PDF extraction pipeline for varied formats — structured and unstructured, scanned vs digital","Skepticism management: building a review workflow that keeps lawyers in control","Evaluation before launch: what does a correct summary look like, who grades it","Week one deliverable: a working demo on 10 real contracts the lawyers pick"],
+      hints: ["The lawyers are skeptical — how do you earn their trust in week one?","What does 'airgap' actually mean for your architecture choices?","How do you measure whether the summaries are good enough to be useful?"],
+      idealSolution: "Start with discovery, not code. Build the eval framework with the lawyers. Demo on their hardest 10 contracts in week one to build trust. Airgap means on-premise model serving."
+    },
+    'Forward Deployed Product Manager': {
+      problem: "A Fortune 100 financial services client signed a six-month deal to use Claude for internal research summarization. Three months in, adoption is at 8%. The executive sponsor is asking what's wrong. You have a call with them in 24 hours. What do you do before that call, and what do you say on it?",
+      keyComponents: ["Diagnosis before prescription — talk to actual users before the exec call","Understanding why adoption is low: is it workflow fit, trust, training, or the product itself?","What 8% means: who are those 8% and what do they know that the other 92% don't?","What to tell the exec: honest status, root cause hypothesis, specific next steps","Scope implication: does low adoption change what gets built next?","What success looks like in month four that would turn this around"],
+      hints: ["What do you do in the next 24 hours before the executive call?","Who do you talk to before that call, and what do you ask them?","What do you tell the exec if the answer is that the product doesn't fit their workflow?"],
+      idealSolution: "Spend 24 hours doing user interviews, not preparing slides. Go to the exec with a root cause, not excuses. Be direct about what needs to change."
+    },
+    'Technical Program Manager': {
+      problem: "You are running a program to integrate Claude into three separate product lines at a large enterprise customer. Each product line has its own engineering team, its own timeline, and its own definition of what 'done' means. The customer's CTO wants a single go-live date in 90 days. Two of the three teams are behind. What do you do?",
+      keyComponents: ["Dependency mapping: what does each team need from the others to go live?","Honest assessment: can 90 days actually happen, and what does the CTO need to know today?","Risk register: what is the most likely reason this misses, and what is the mitigation?","Definition alignment: getting three teams to agree on what 'done' means before day 60","Executive communication: how to tell the CTO two teams are behind without causing panic","Go-no-go criteria: what has to be true on day 85 to proceed vs delay"],
+      hints: ["What is your first move — is it talking to the teams or talking to the CTO?","The CTO wants one date. What do you do if the honest answer is that 90 days is not realistic?","How do you get three teams with different definitions of done to agree on one?"],
+      idealSolution: "Talk to all three teams before touching the timeline. Build the real dependency map. Give the CTO an honest assessment with options, not a false commitment."
+    }
+  },
+
+  OpenAI: {
+    'AI Solutions Architect': {
+      problem: "A global e-commerce company wants to use GPT-4o to power a customer support agent that handles 2 million tickets per day across 40 languages. Their current average resolution time is 8 minutes. They want the AI to resolve 60% of tickets without human intervention within six months. Walk me through your architecture and how you would hit that target.",
+      keyComponents: ["Scale design: 2M tickets per day requires batching, queuing, and async processing","Multilingual handling: translation layer vs multilingual embedding models","Intent classification and routing: which tickets the AI can resolve vs must escalate","Latency and cost optimization at scale: caching, model selection by ticket type","Evaluation: what does 'resolved' mean, who grades it, and how do you prevent gaming the metric","60% target: phased approach, starting with highest-confidence ticket types"],
+      hints: ["How do you handle 40 languages without breaking the architecture?","What does 'resolved without human intervention' actually mean, and how do you measure it honestly?","Walk me through what happens on day one when the model makes a mistake that angers a customer."],
+      idealSolution: "Start with the 20% of ticket types that are highest confidence. Build strict eval criteria. Scale from there. 60% in 6 months requires a phased rollout, not a big-bang launch."
+    },
+    'Forward Deployed Engineer': {
+      problem: "A media company wants an AI agent that can autonomously research, draft, and fact-check news article summaries using their internal archive and real-time web search. The editorial team needs to be able to trust the output enough to publish with minimal review. You have access to the OpenAI API and their existing CMS. Walk me through how you build this, and how you know when it is ready to trust.",
+      keyComponents: ["Agent architecture: research, draft, and fact-check as separate agent steps","Hallucination prevention: grounding claims in retrieved sources, citation tracking","Fact-check step: cross-referencing internal archive vs web search for consistency","Editorial control: keeping humans in the loop at the right points before publishing","Evaluation: how do you measure factual accuracy before putting editors at risk?","Rate limiting and cost at scale if the agent runs on every article"],
+      hints: ["Walk me through how you diagnose high latency in this LLM pipeline — where do you look first?","How do you evaluate whether the fact-check step is actually catching errors?","What is your plan when the agent confidently states something that turns out to be wrong?"],
+      idealSolution: "Multi-step agent with citation tracking at every claim. Fact-check step compares against primary sources. Eval suite graded by editors before production use."
+    },
+    'Forward Deployed Product Manager': {
+      problem: "OpenAI has sold a six-figure enterprise contract to a healthcare insurance company to use the API for claims processing automation. The customer's technical team is competent but their procurement and legal teams have raised 14 open questions about HIPAA, data retention, and audit trails that are blocking go-live. The contract requires go-live in 45 days. You have been assigned to this account. What is your plan?",
+      keyComponents: ["Triage the 14 questions: which ones actually block go-live vs which are nice-to-have?","Legal and compliance escalation path: who at OpenAI can answer the hard questions?","Customer communication: honest timeline given the open items","What can be built in parallel while compliance is resolved?","Risk to the contract if go-live slips beyond 45 days","What the customer needs to see to gain confidence: documentation, certifications, architecture review"],
+      hints: ["How do you triage 14 open questions into what blocks go-live and what doesn't?","The 45-day deadline is at risk. When do you tell leadership, and what do you tell them?","What does the customer need to see to gain enough confidence to proceed?"],
+      idealSolution: "Triage immediately. Escalate the genuine blockers, resolve the rest in documentation. Give the customer a credible compliance package. Be direct about timeline risk."
+    },
+    'Technical Program Manager': {
+      problem: "You are TPM on the launch of a new enterprise product feature at OpenAI. The feature involves five teams: API infrastructure, safety, legal, enterprise sales, and product. The launch date is set externally — it was announced at a conference. Safety has raised a concern three weeks before launch that could require a two-week fix. What do you do?",
+      keyComponents: ["Safety concern assessment: is this a blocking risk or a manageable risk?","Stakeholder communication: who needs to know, in what order, and what do you tell them?","Option analysis: delay, launch with known risk, or launch a reduced scope","External commitment management: the date was announced publicly","Safety vs schedule tradeoff: how you frame this decision for leadership","Go-no-go criteria: what has to be resolved for the launch to proceed"],
+      hints: ["What is your first call after you hear about the safety concern?","How do you frame a delay recommendation to leadership when the date is already public?","What are the options, and who owns the decision?"],
+      idealSolution: "Safety concern gets a full assessment immediately. Present leadership with options and tradeoffs, not a recommendation that buries the risk. The decision is theirs, but they need the full picture."
+    }
+  },
+
+  Google: {
+    'AI Solutions Architect': {
+      problem: "Google Cloud is pitching an enterprise AI platform to a Fortune 500 retailer that wants to use Vertex AI to build personalized product recommendations at scale — 50 million users, 5 million SKUs, real-time inference under 100ms. Their current system is a batch-updated collaborative filter. Walk me through the architecture and how you would measure whether the new system is better.",
+      keyComponents: ["Real-time vs batch: embedding serving architecture for 100ms latency at 50M users","Feature store design: what features, how freshness is maintained, what the staleness tradeoff is","Model selection: two-tower retrieval vs cross-encoder re-ranking, why and when to use each","A/B testing framework: how to run the experiment to prove the new system is better","Metrics: click-through rate, conversion, revenue per session — and which one is the north star","Rollout plan: what percentage of traffic, what the rollback trigger is"],
+      hints: ["How do you hit 100ms p99 with 50M users and 5M SKUs — walk me through the retrieval and ranking steps?","What does better actually mean here — how do you run the experiment?","What is your rollback plan if the new system increases clicks but decreases conversion?"],
+      idealSolution: "Two-tower retrieval for candidate generation, cross-encoder for re-ranking. Feature store with short TTLs for real-time signals. A/B test on a held-out traffic slice with conversion as the north star metric."
+    },
+    'Technical Program Manager': {
+      problem: "You are a Google TPM responsible for launching a new AI API product across three regions simultaneously — US, EU, and APAC. The EU launch requires GDPR compliance work that is owned by a separate legal-engineering team you have no authority over. That team is six weeks behind. Your external launch date is fixed. What do you do?",
+      keyComponents: ["Dependency identification: GDPR work is on the critical path and you don't own it","Escalation: who can apply pressure to the legal-engineering team and when do you escalate?","Options: launch US and APAC on time, delay EU, or delay everything","External communication if EU is delayed: what customers were told and what they need to know","Tracking: how you get visibility into a team you don't manage","Launch criteria: what has to be true for EU to go live, and who approves it"],
+      hints: ["The team that owns the blocking work doesn't report to you. What do you do?","When do you escalate, and to whom?","How do you manage the external commitment if EU has to slip?"],
+      idealSolution: "Escalate early, not late. Launch US and APAC on time if the GDPR work can be isolated. Give EU customers honest timeline. Build the dependency into the weekly program review from week one."
+    }
+  },
+
+  Meta: {
+    'AI Solutions Architect': {
+      problem: "Meta is building an AI-powered content moderation system that needs to classify 10 billion posts per day across text, image, and video in 60 languages. The system must have an explainable decision trail that can be reviewed by human moderators and used in regulatory reporting. Walk me through the architecture and how you balance accuracy, speed, and explainability.",
+      keyComponents: ["Scale: 10B posts per day requires streaming processing, not batch — Kafka-style pipeline","Multimodal: text, image, and video require different model architectures stitched together","Explainability: what makes a decision reviewable — attention weights, retrieved evidence, confidence scores","Human review queue: which posts get flagged for human review and how that queue is prioritized","Regulatory requirement: what the audit trail needs to contain and how it is stored","Accuracy vs recall tradeoff: the cost of false positives vs false negatives in moderation"],
+      hints: ["How do you make the system's decision explainable to a human moderator who needs to overturn it?","Walk me through what happens at 10 billion posts per day — where are the bottlenecks?","What does the regulatory audit trail need to look like to satisfy a government inquiry?"],
+      idealSolution: "Streaming pipeline with model cascade: fast classifier first, expensive models only for borderline cases. Explainability via retrieved evidence and confidence. Tiered human review queue by confidence band."
+    },
+    'Forward Deployed Product Manager': {
+      problem: "A media and entertainment company has licensed Meta's AI video generation API to build a tool for their creative teams. After two months, the creative directors love it but the legal team has flagged that 30% of generated videos contain elements that resemble copyrighted material closely enough to create liability. The contract renewal is in 60 days. What is your plan?",
+      keyComponents: ["Root cause: is this a model problem, a prompt problem, or a workflow problem?","Legal triage: which 30% of cases are actual liability vs over-cautious flagging?","Customer relationship: how do you tell the customer that 30% of their outputs may have legal risk?","Short-term mitigation while a fix is being built: workflow changes, guardrails, human review","What Meta can actually fix in 60 days vs what requires model retraining","Renewal at risk: what does the customer need to see to renew?"],
+      hints: ["How do you diagnose whether this is a model problem or a prompting problem?","What do you tell the customer right now, today, about the 30%?","What can realistically be fixed in 60 days, and what cannot?"],
+      idealSolution: "Immediate root cause analysis. Honest conversation with the customer about what is fixable by renewal. Short-term workflow mitigations while the model fix is in progress. Don't promise what cannot be delivered."
+    }
+  },
+
+  Microsoft: {
+    'AI Solutions Architect': {
+      problem: "A large European bank wants to deploy Azure OpenAI Service to help relationship managers summarize client portfolios and draft client communications. The bank's IT security team requires all data to stay within their Azure tenant, all model interactions to be logged for seven years for regulatory purposes, and the system to pass a third-party security audit before go-live. Walk me through the architecture and the path to audit.",
+      keyComponents: ["Data residency: Azure OpenAI with private endpoints, VNet integration, no data leaving tenant","Logging architecture: complete prompt and response logging with immutable storage for 7 years","Access control: role-based access, who can see what, audit trail on data access","Third-party audit preparation: what the auditor needs to see, which controls to prioritize","Integration with the bank's existing Azure infrastructure — not a greenfield deployment","Go-live timeline given the audit requirement"],
+      hints: ["How do you design the logging architecture so it survives a regulatory audit seven years from now?","The third-party auditor wants to see your controls documentation. What are the five most important controls?","What is the go-live timeline once all the security requirements are mapped?"],
+      idealSolution: "Azure OpenAI with private endpoints and customer-managed keys. Immutable audit log in Azure Monitor with 7-year retention. RBAC on all access. Audit path built from day one, not retrofitted."
+    },
+    'Technical Program Manager': {
+      problem: "You are a TPM at Microsoft running the integration of Copilot into a large enterprise customer's Microsoft 365 environment. The customer has 80,000 users. The rollout plan calls for a phased deployment: 500 pilot users in month one, 10,000 in month three, full rollout by month six. After the pilot, adoption among the 500 is only 12%. The month-three expansion is two weeks away. What do you do?",
+      keyComponents: ["12% adoption in pilot: root cause before proceeding — is it training, workflow fit, or product?","Decision: proceed with month-three expansion, delay, or adjust scope?","Data to collect: which of the 500 are using it, what are they using it for, what's blocking the rest?","Customer communication: the 10,000-user expansion is on the calendar — who needs to know what?","What changes before month three to improve the adoption curve?","Success metric: what adoption rate at month three would indicate the rollout is on track?"],
+      hints: ["What do you do in the two weeks before the month-three expansion?","12% adoption — do you proceed with the 10,000-user expansion or not?","What does the customer need to hear, and who delivers that message?"],
+      idealSolution: "Stop and diagnose before expanding. Talk to the 12% who are using it and the 88% who aren't. Present the customer with data and a recommendation, not a default rollout. Adjust the expansion plan based on findings."
+    }
+  },
+
+  Amazon: {
+    'AI Solutions Architect': {
+      problem: "An Amazon retail division wants to use Bedrock to build an AI assistant for warehouse operations managers — answering questions about inventory levels, shift staffing, and equipment maintenance schedules from natural language. The system needs to work for managers who have no technical background, integrate with three internal data systems that have no APIs, and be ready for peak season in 14 weeks. Start with the customer problem and work backwards.",
+      keyComponents: ["Customer obsession: what does the operations manager actually need, not what engineering thinks they need","No-API integration: how to access the three internal systems — direct DB, screen scraping, or data pipeline","Natural language interface for non-technical users: prompt design and error handling for vague queries","14-week timeline: what is the MVP, what is the v2, and what gets cut?","Working backwards from peak season: what failure mode would be most costly to the business?","Measurement: how do you know the assistant is actually helping managers make better decisions"],
+      hints: ["Start with the customer — what does an operations manager actually ask during a shift?","Three systems with no APIs — walk me through how you get the data you need?","14 weeks to peak season. What gets cut from the MVP to hit that date?"],
+      idealSolution: "Work backwards from a day in the life of an operations manager. Build a data pipeline to the three systems. Define the MVP as the three most common question types. Measure time-to-decision, not clicks."
+    },
+    'Forward Deployed Engineer': {
+      problem: "An Amazon logistics partner wants to use AI to reduce unplanned downtime across 200 delivery vans. They have GPS data, maintenance logs in PDFs, and a scheduling system with a proprietary API that is poorly documented. Their operations team says unplanned breakdowns cost them $800,000 a year. They want a solution in eight weeks. Where do you start, and what does week one actually look like?",
+      keyComponents: ["Customer discovery: talking to the mechanics and fleet managers, not just leadership","Data quality: GPS data is clean, PDFs are messy, the proprietary API is a risk","Week one deliverable: something working, not a plan — even if it is just threshold alerts on GPS anomalies","Phase one vs phase two: prove value fast with simple alerts before building the ML prediction model","Defining success: not model accuracy but actual reduction in unplanned breakdowns","The proprietary API: what is the backup plan if it takes three weeks to reverse-engineer?"],
+      hints: ["What does week one actually look like — what do you build, and who do you talk to?","The proprietary API is poorly documented. Walk me through how you handle that risk.","How do you prove value to the customer before you have a full ML model?"],
+      idealSolution: "Week one: on-site with the mechanics, not at a laptop. Build threshold alerts from GPS data — ship something working by day five. The ML model comes in phase two once data pipelines are proven."
+    },
+    'Forward Deployed Product Manager': {
+      problem: "A major retailer has contracted with Amazon to deploy an AI-powered demand forecasting system ahead of their peak season. Three weeks before go-live, the customer's data engineering team reveals that two of the five data sources the model was trained on are unreliable — they have a 15% error rate that was not disclosed during onboarding. The customer's VP is expecting the go-live announcement next week. What do you do?",
+      keyComponents: ["Customer obsession: what does a 15% error rate in training data mean for the model's accuracy at peak?","Data triage: which two sources, and can the model still work without them or with corrections?","Honest communication: what does the customer VP need to know, and when?","Scope and timeline implications: does go-live slip, or can this be mitigated in three weeks?","Ownership: who was responsible for data quality validation, and what is the process fix going forward?","What Amazon can deliver by peak season versus what needs to be phased"],
+      hints: ["What is your first call after you learn about the data quality issue?","The VP is expecting a go-live announcement next week. What do you tell them?","Can the model still deliver value at peak with two unreliable data sources?"],
+      idealSolution: "Tell the VP immediately — not after you have a solution. Present the data quality issue, the model impact, and the options. Deliver what can be delivered safely. Do not launch a model you know is compromised to hit a deadline."
+    },
+    'Technical Program Manager': {
+      problem: "You are a TPM at Amazon Web Services managing a program to migrate a large enterprise customer from a competitor cloud to AWS. The migration covers 400 workloads across 18 months. Six months in, the program is on track for 60 workloads but the customer's CTO has learned that a competitor is offering a significant discount to stay. The customer is now questioning the migration. What do you do?",
+      keyComponents: ["Immediate action: understanding the customer's specific concerns before preparing a response","Risk assessment: what is the realistic probability of losing the customer?","Value delivered so far: what have the 60 migrated workloads actually delivered for the customer?","Program implications if the customer pauses or exits: contracts, in-progress work, team impact","Escalation: who at AWS needs to know today?","What would change the customer's calculus: pricing, additional services, success stories"],
+      hints: ["What do you do in the next 24 hours?","The customer is questioning the migration. Who do you call, and what do you say?","What does the customer need to see to stay committed?"],
+      idealSolution: "Talk to the CTO directly — not through email. Understand the specific concern before responding. Escalate to AWS account leadership immediately. Lead with value delivered, not pricing defense."
+    }
+  },
+
+  Nvidia: {
+    'AI Solutions Architect': {
+      problem: "A self-driving car startup wants to use Nvidia's AI infrastructure to train their next-generation perception model. They need to scale from their current 100-GPU cluster to 2,000 GPUs within six months. Their current training runs take 14 days for a full model. They want that down to under 48 hours. Walk me through the infrastructure architecture and where the bottlenecks are.",
+      keyComponents: ["Distributed training architecture: data parallelism vs model parallelism vs pipeline parallelism — when to use each","Network fabric: InfiniBand requirement for GPU-to-GPU communication at 2,000-GPU scale","Storage throughput: 14-day run means the data pipeline is almost certainly a bottleneck","Profiling the current run before designing the new architecture — you cannot optimize what you have not measured","From 14 days to 48 hours: the math on what speedup is actually achievable at 2,000 GPUs","Where Hopper vs Ampere matters for this specific workload"],
+      hints: ["Before recommending an architecture, what profiling data do you ask for?","The bottleneck at 2,000 GPUs is almost never the compute. Where do you look first?","Walk me through the math on whether 14 days to 48 hours is achievable with 20x more GPUs."],
+      idealSolution: "Profile first — identify whether the bottleneck is compute, network, or storage. InfiniBand at 2,000 GPUs is non-negotiable. Model parallelism for large models. NVMe-over-fabric for storage. 14 to 48 hours requires near-linear scaling which requires the network to be right."
+    },
+    'Forward Deployed Engineer': {
+      problem: "A financial services firm wants to run LLM inference for real-time risk assessment on Nvidia hardware within their own data center — fully airgapped, no cloud. They need sub-100ms latency for 70B parameter models, handling 10,000 requests per minute. They currently have no GPU infrastructure. Walk me through the deployment architecture and what you scope for week one.",
+      keyComponents: ["Hardware selection: H100 vs A100 for 70B inference, how many GPUs per node","Model quantization: INT8 or FP8 to hit sub-100ms at 70B parameters","Batching strategy: how to hit 10,000 RPM with acceptable latency — continuous batching vs static","Airgap requirements: no telemetry, no model updates without manual process, security audit","KV cache sizing: memory budget for 70B model at target concurrency","Week one deliverable: a working latency benchmark on a single node"],
+      hints: ["What is your first step — is it hardware procurement or something else?","Walk me through the math on whether sub-100ms is achievable for a 70B model — what does it depend on?","The customer has no GPU infrastructure. What is the fastest path to a working benchmark?"],
+      idealSolution: "Week one is a latency benchmark on rented cloud H100s before the hardware arrives — prove the architecture works before committing to procurement. INT8 quantization for 70B. Continuous batching. Memory budget the KV cache carefully."
+    }
+  }
+};

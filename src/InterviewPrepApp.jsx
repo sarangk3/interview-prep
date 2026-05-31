@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { QUESTION_BANK, INDUSTRIES, ROLES, OPENING_PROBLEMS, MOCK_TARGETS, EXTRA_PROBLEMS, COMPANY_PERSONAS } from './questions';
+import { QUESTION_BANK, INDUSTRIES, ROLES, OPENING_PROBLEMS, MOCK_TARGETS, EXTRA_PROBLEMS, COMPANY_PERSONAS, COMPANY_PROBLEMS } from './questions';
 import { supabase } from './supabase';
 
 const G = () => (
@@ -447,16 +447,34 @@ export default function InterviewPrepApp() {
     setErrorMsg('');setConfirmExit(false);
 
     if(format==='mock'){
-      // Build pool: original problem + extras for this role/industry
-      const base = OPENING_PROBLEMS[r]?.[industry] || OPENING_PROBLEMS[r]?.['General'];
-      const baseTarget = MOCK_TARGETS[r]?.[industry] || MOCK_TARGETS[r]?.['General'];
-      const extras = EXTRA_PROBLEMS?.[r]?.[industry] || EXTRA_PROBLEMS?.[r]?.['General'] || [];
-      const allProblems = [
-        { title: base.title, problem: base.problem, keyComponents: baseTarget?.keyComponents||[], hints: baseTarget?.hints||[], idealSolution: baseTarget?.idealSolution||'' },
-        ...extras.map(e => ({ title: e.title, problem: e.problem, keyComponents: e.keyComponents||[], hints: e.hints||[], idealSolution: e.idealSolution||'' })),
-      ];
+      // Use company-specific problem if available, otherwise fall back to general pool
+      const companyProblem = COMPANY_PROBLEMS?.[company]?.[r];
+      let allProblems;
+      if(companyProblem) {
+        // Company-specific problem is always first, then add general pool problems
+        const base = OPENING_PROBLEMS[r]?.['General'];
+        const baseTarget = MOCK_TARGETS[r]?.['General'];
+        const extras = EXTRA_PROBLEMS?.[r]?.['General'] || [];
+        const generalProblems = [
+          { title: base?.title||r, problem: base?.problem||'', keyComponents: baseTarget?.keyComponents||[], hints: baseTarget?.hints||[], idealSolution: baseTarget?.idealSolution||'' },
+          ...extras.map(e => ({ title: e.title, problem: e.problem, keyComponents: e.keyComponents||[], hints: e.hints||[], idealSolution: e.idealSolution||'' })),
+        ];
+        allProblems = [
+          { title: `${company} — ${r}`, problem: companyProblem.problem, keyComponents: companyProblem.keyComponents||[], hints: companyProblem.hints||[], idealSolution: companyProblem.idealSolution||'' },
+          ...generalProblems,
+        ];
+      } else {
+        // No company-specific problem — use general pool
+        const base = OPENING_PROBLEMS[r]?.[industry] || OPENING_PROBLEMS[r]?.['General'];
+        const baseTarget = MOCK_TARGETS[r]?.[industry] || MOCK_TARGETS[r]?.['General'];
+        const extras = EXTRA_PROBLEMS?.[r]?.[industry] || EXTRA_PROBLEMS?.[r]?.['General'] || [];
+        allProblems = [
+          { title: base.title, problem: base.problem, keyComponents: baseTarget?.keyComponents||[], hints: baseTarget?.hints||[], idealSolution: baseTarget?.idealSolution||'' },
+          ...extras.map(e => ({ title: e.title, problem: e.problem, keyComponents: e.keyComponents||[], hints: e.hints||[], idealSolution: e.idealSolution||'' })),
+        ];
+      }
       // Rotate: avoid repeating until all problems shown
-      const storageKey = `mock_${r}_${industry}`;
+      const storageKey = `mock_${r}_${company||industry}`;
       const used = JSON.parse(localStorage.getItem(storageKey) || '[]');
       const available = allProblems.map((_,i)=>i).filter(i=>!used.includes(i));
       const pool = available.length > 0 ? available : allProblems.map((_,i)=>i);
@@ -1768,17 +1786,35 @@ export default function InterviewPrepApp() {
                   </div>
                   {/* Company, only for mock */}
 
-                  {/* Industry */}
-                  <div className="fu d2" style={{marginBottom:28}}>
-                    <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Industry focus</p>
-                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                      {INDUSTRIES.map(ind=>(
-                        <button key={ind} className={`chip ${industry===ind?'on':''}`} onClick={()=>setIndustry(ind)}>
-                          {ind}
-                        </button>
-                      ))}
+                  {/* Company selector for mock, Industry for written/MC */}
+                  {format==='mock' ? (
+                    <div className="fu d2" style={{marginBottom:28}}>
+                      <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:4}}>Target company</p>
+                      <p style={{fontSize:12,color:'#9CA3AF',marginBottom:12}}>The interviewer's style and questions adapt to your target company.</p>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8}}>
+                        {Object.entries(COMPANY_PERSONAS).map(([name,cfg])=>(
+                          <button key={name} onClick={()=>setCompany(name)}
+                            className={`chip ${company===name?'on':''}`}
+                            style={{padding:'10px 12px',borderRadius:10,border:company===name?`2px solid ${cfg.color}`:'1px solid #E5E7EB',
+                              background:company===name?cfg.bg:'#fff',color:company===name?cfg.color:'#374151',
+                              fontWeight:company===name?600:400,textAlign:'left',cursor:'pointer',fontSize:13}}>
+                            {name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="fu d2" style={{marginBottom:28}}>
+                      <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Industry focus</p>
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                        {INDUSTRIES.map(ind=>(
+                          <button key={ind} className={`chip ${industry===ind?'on':''}`} onClick={()=>setIndustry(ind)}>
+                            {ind}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {/* Full mock */}
                   <div className="fu d3" style={{marginBottom:28}}>
                     <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
