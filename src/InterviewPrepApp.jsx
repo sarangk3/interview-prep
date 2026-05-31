@@ -1212,29 +1212,6 @@ export default function InterviewPrepApp() {
                       })}
                     </div>
                   </div>
-                  {/* Quick practice, hidden for mock */}
-                  {format!=='mock'&&(
-                  <div className="fu d4">
-                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
-                      <h2 style={{fontSize:16,fontWeight:600,color:'#111827'}}>Quick Practice</h2>
-                      <span style={{fontSize:11,background:'#F3F4F6',color:'#6B7280',padding:'3px 10px',borderRadius:20}}>1 question</span>
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:10}}>
-                      {ROLES.map(r=>{
-                        const c=ROLE_CFG[r];
-                        return (
-                          <div key={r} className="rc" onClick={()=>startInterview(r,'deep')} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px'}}>
-                            <div>
-                              <div style={{width:6,height:6,borderRadius:'50%',background:c.color,marginBottom:8}}/>
-                              <p style={{fontSize:13,fontWeight:600,color:'#374151'}}>{c.short}</p>
-                            </div>
-                            <span style={{color:'#D1D5DB',fontSize:18}}>›</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  )}
                 </div>
               )}
 
