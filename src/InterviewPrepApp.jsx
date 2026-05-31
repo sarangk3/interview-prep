@@ -248,7 +248,14 @@ export default function InterviewPrepApp() {
     try {
       const res = await fetch('/api/profile', { headers:{ 'Authorization':`Bearer ${session.access_token}` } });
       const data = await res.json();
-      if (data.profile) setProfile(data.profile);
+      if (data.profile) {
+        setProfile(data.profile);
+        // Sync display_name: Supabase → localStorage → state
+        if (data.profile.display_name) {
+          setUserName(data.profile.display_name);
+          localStorage.setItem('user_name', data.profile.display_name);
+        }
+      }
     } catch(e) { console.warn('Profile load error:', e.message); }
   };
 
@@ -438,6 +445,11 @@ export default function InterviewPrepApp() {
         const name = derived.charAt(0).toUpperCase() + derived.slice(1);
         setUserName(name);
         localStorage.setItem('user_name', name);
+        // Save to Supabase if not already stored
+        if (!profile?.display_name) {
+          supabase.from('profiles').upsert({ id: user.id, display_name: name }, { onConflict: 'id' });
+          setProfile(p => ({ ...p, display_name: name }));
+        }
         doStartInterview(r, m);
         return;
       }
@@ -868,9 +880,25 @@ export default function InterviewPrepApp() {
             <h2 style={{fontSize:20,fontWeight:700,color:'#111827',marginBottom:8}}>Before we begin</h2>
             <p style={{fontSize:14,color:'#6B7280',marginBottom:24,lineHeight:1.6}}>What should your interviewer call you?</p>
             <input type="text" placeholder="Your first name" autoFocus value={userName} onChange={e=>setUserName(e.target.value)}
-              onKeyDown={e=>{if(e.key==='Enter'&&userName.trim()){localStorage.setItem('user_name',userName.trim());setShowNamePrompt(false);doStartInterview(pendingRole,'full');}}}
+              onKeyDown={e=>{if(e.key==='Enter'&&userName.trim()){
+                const name=userName.trim();
+                localStorage.setItem('user_name',name);
+                if(user){supabase.from('profiles').upsert({id:user.id,display_name:name},{onConflict:'id'});setProfile(p=>({...p,display_name:name}));}
+                setShowNamePrompt(false);doStartInterview(pendingRole,'full');
+              }}}
               style={{width:'100%',padding:'12px 14px',border:'1px solid #E5E7EB',borderRadius:10,fontSize:15,color:'#111827',background:'#F9FAFB',marginBottom:16}}/>
-            <button className="bp" onClick={()=>{if(userName.trim()){localStorage.setItem('user_name',userName.trim());setShowNamePrompt(false);doStartInterview(pendingRole,'full');}}} style={{width:'100%',padding:'13px',fontSize:15}}>
+            <button className="bp" onClick={()=>{
+              if(userName.trim()){
+                const name = userName.trim();
+                localStorage.setItem('user_name', name);
+                if(user) {
+                  supabase.from('profiles').upsert({ id: user.id, display_name: name }, { onConflict: 'id' });
+                  setProfile(p => ({ ...p, display_name: name }));
+                }
+                setShowNamePrompt(false);
+                doStartInterview(pendingRole,'full');
+              }
+            }} style={{width:'100%',padding:'13px',fontSize:15}}>
               Start interview →
             </button>
             <button onClick={()=>{setShowNamePrompt(false);setUserName('');doStartInterview(pendingRole,'full');}} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:10,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
