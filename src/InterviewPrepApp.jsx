@@ -394,6 +394,7 @@ export default function InterviewPrepApp() {
     setAuthError(error ? error.message : 'Password reset email sent, check your inbox.');
   };
   useEffect(()=>{ if(page==='results'){const t=setTimeout(()=>setBarsAnim(true),400);return()=>clearTimeout(t);} setBarsAnim(false); },[page]);
+  useEffect(()=>{ if(page!=='interview') stopSpeech(); },[page]);
   useEffect(()=>{ if(page!=='interview'){setElapsed(0);return;} const t=setInterval(()=>setElapsed(e=>e+1),1000);return()=>clearInterval(t); },[page]);
   useEffect(()=>setElapsed(0),[qIndex]);
   useEffect(()=>{ chatEndRef.current?.scrollIntoView({behavior:'smooth'}); },[mockMessages,mockThinking]);
@@ -450,32 +451,14 @@ export default function InterviewPrepApp() {
     stopSpeech();
     const speakRole = roleOverride || role;
 
-    const VOICE_MAP = {
-      'AI Solutions Architect':           'TxGEqnHWrfWFTfGW9XjX',
-      'Forward Deployed Engineer':        'TxGEqnHWrfWFTfGW9XjX',
-      'Forward Deployed Product Manager': '21m00Tcm4TlvDq8ikWAM',
-      'Technical Program Manager':        'pNInz6obpgDQGcFmaJgB',
-    };
-    const voiceId = VOICE_MAP[speakRole] || 'TxGEqnHWrfWFTfGW9XjX';
-    const apiKey = 'sk_1d2128c797de3f6ebf85c7991fbc3fd28dab7f2f0afcf62e';
-
-    // Call ElevenLabs directly from the browser (no Vercel proxy needed)
+    // Call ElevenLabs via Vercel serverless function
     try {
-      const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/#{1,3} /g,'');
-      const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: {
-          'xi-api-key': apiKey,
-          'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg',
-        },
-        body: JSON.stringify({
-          text: clean,
-          model_id: 'eleven_turbo_v2',
-          voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, role: speakRole }),
       });
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('audio')) {
         const blob = await res.blob();
         if (blob.size > 100) {
           const url = URL.createObjectURL(blob);
@@ -489,7 +472,7 @@ export default function InterviewPrepApp() {
         }
       }
     } catch(e) {
-      console.warn('ElevenLabs direct call failed, using browser TTS:', e.message);
+      console.warn('ElevenLabs TTS failed, using browser voice:', e.message);
     }
 
     fallbackTTS(text);
@@ -518,6 +501,7 @@ export default function InterviewPrepApp() {
       window._ttsAudio.currentTime = 0;
       window._ttsAudio = null;
     }
+    window.speechSynthesis?.cancel();
     setTtsPlaying(false);
   };
 
