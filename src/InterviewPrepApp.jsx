@@ -38,7 +38,23 @@ const G = () => (
       .ap{width:100%!important;border-left:none!important;border-top:1px solid #E5E7EB!important;}
       .mp{padding:20px 16px!important;} .s4{grid-template-columns:repeat(2,1fr)!important;}
       .s2{grid-template-columns:1fr!important;} .rg{grid-template-columns:1fr!important;}
+      .mobile-content{padding-bottom:72px!important;}
     }
+    .mob-bar{display:none;}
+    .mob-header{display:none;}
+    @media(max-width:768px){
+      .mob-bar{display:flex;position:fixed;bottom:0;left:0;right:0;height:64px;background:#fff;border-top:1px solid #E5E7EB;z-index:100;padding-bottom:env(safe-area-inset-bottom);}
+      .mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:#9CA3AF;cursor:pointer;background:none;border:none;padding:0;transition:color .15s;}
+      .mob-tab.on{color:#6366F1;}
+      .mob-tab svg{width:22px;height:22px;stroke-width:1.8;fill:none;stroke:currentColor;}
+      .mob-header{display:flex;position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #E5E7EB;padding:12px 16px;align-items:center;justify-content:space-between;}
+      .prof-sheet{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;justify-content:flex-end;}
+      .prof-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.5);}
+      .prof-panel{position:relative;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 36px;z-index:1;}
+      .prof-handle{width:36px;height:4px;background:#E5E7EB;border-radius:2px;margin:0 auto 20px;}
+    }
+    @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+    .prof-panel{animation:slideUp .25s ease;}
   `}</style>
 );
 
@@ -182,6 +198,7 @@ export default function InterviewPrepApp() {
   const [format,setFormat]         = useState('text');
   const [company,setCompany]       = useState('Anthropic');
   const [selectedRole,setSelectedRole] = useState(null);
+  const [showProfileSheet,setShowProfileSheet] = useState(false);
   const [mockMessages,setMockMessages]   = useState([]);
   const [mockTurnCount,setMockTurnCount] = useState(0);
   const [mockThinking,setMockThinking]   = useState(false);
@@ -618,7 +635,90 @@ export default function InterviewPrepApp() {
         </div>
       )}
       <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
-        <Sidebar page={page} setPage={setPage} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}}/>
+        <Sidebar page={page} setPage={p=>{setPage(p);setSelectedRole(null);}} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}}/>
+
+        {/* ── Mobile header (top bar) ── */}
+        {page!=='interview' && (
+          <div className="mob-header">
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:28,height:28,borderRadius:7,background:'linear-gradient(135deg,#6366F1,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'#fff'}}>AI</div>
+              <span style={{fontWeight:700,fontSize:15,color:'#111827'}}>Interview Prep</span>
+            </div>
+            <button onClick={()=>setShowProfileSheet(true)} style={{background:'none',border:'none',cursor:'pointer',width:36,height:36,borderRadius:'50%',background:'#F3F4F6',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* ── Profile sheet (mobile) ── */}
+        {showProfileSheet && (
+          <div className="prof-sheet">
+            <div className="prof-backdrop" onClick={()=>setShowProfileSheet(false)}/>
+            <div className="prof-panel">
+              <div className="prof-handle"/>
+              {user ? (
+                <>
+                  <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,paddingBottom:20,borderBottom:'1px solid #F3F4F6'}}>
+                    <div style={{width:44,height:44,borderRadius:'50%',background:'linear-gradient(135deg,#6366F1,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:700,color:'#fff',flexShrink:0}}>
+                      {user.email?.[0]?.toUpperCase()}
+                    </div>
+                    <div style={{overflow:'hidden'}}>
+                      <p style={{fontSize:14,fontWeight:600,color:'#111827',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{user.email}</p>
+                      <span style={{fontSize:12,fontWeight:600,color:isPro?'#059669':'#6366F1',background:isPro?'#F0FDF4':'#EEF2FF',padding:'2px 8px',borderRadius:10}}>{isPro?'Pro':'Free Plan'}</span>
+                    </div>
+                  </div>
+                  {!isPro && (
+                    <div style={{background:'#F5F3FF',borderRadius:12,padding:'14px 16px',marginBottom:16}}>
+                      <p style={{fontSize:13,fontWeight:600,color:'#6D28D9',marginBottom:4}}>Upgrade to Pro</p>
+                      <p style={{fontSize:12,color:'#7C3AED',marginBottom:12}}>Unlimited AI answers, unlimited mock interviews, full history.</p>
+                      <button className="bp" onClick={()=>{setShowProfileSheet(false);setUpgradeReason('answers');setShowUpgrade(true);}} style={{width:'100%',padding:'11px',fontSize:14}}>
+                        See plans →
+                      </button>
+                    </div>
+                  )}
+                  {isPro && (
+                    <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:12,padding:'12px 16px',marginBottom:16}}>
+                      <p style={{fontSize:13,fontWeight:600,color:'#15803D'}}>Pro plan active</p>
+                      <p style={{fontSize:12,color:'#6B7280',marginTop:2}}>Unlimited everything</p>
+                    </div>
+                  )}
+                  <button onClick={()=>{handleLogout();setShowProfileSheet(false);}} style={{width:'100%',padding:'12px',background:'none',border:'1px solid #FEE2E2',borderRadius:10,color:'#DC2626',fontSize:14,fontWeight:600,cursor:'pointer'}}>
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{fontSize:16,fontWeight:600,color:'#111827',marginBottom:6}}>Sign in or create account</p>
+                  <p style={{fontSize:13,color:'#6B7280',marginBottom:20}}>Save your results and track your progress over time.</p>
+                  <button className="bp" onClick={()=>{setShowProfileSheet(false);setAuthMode('signup');setAuthError('');setPage('signin');}} style={{width:'100%',padding:'12px',fontSize:15,marginBottom:10}}>
+                    Create free account →
+                  </button>
+                  <button className="bg" onClick={()=>{setShowProfileSheet(false);setAuthMode('login');setAuthError('');setPage('signin');}} style={{width:'100%',padding:'12px',fontSize:15}}>
+                    Sign in
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Mobile bottom tab bar ── */}
+        {page!=='interview' && (
+          <nav className="mob-bar">
+            {[
+              {id:'roles',label:'Guides',icon:<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>},
+              {id:'home',label:'Practice',icon:<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>},
+              {id:'dashboard',label:'Progress',icon:<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>},
+            ].map(tab=>(
+              <button key={tab.id} className={`mob-tab ${page===tab.id?'on':''}`} onClick={()=>{setPage(tab.id);setSelectedRole(null);}}>
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        )}
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
 
           {/* ── Auth modal (standalone sign in page) ── */}
@@ -793,7 +893,7 @@ export default function InterviewPrepApp() {
 
           {/* ════ SCROLLABLE PAGES ════ */}
           {page!=='interview' && page!=='signin' && (
-            <div style={{flex:1,overflowY:'auto'}}>
+            <div style={{flex:1,overflowY:'auto'}} className="mobile-content">
 
               {/* ── ROLES GUIDE ── */}
               {page==='roles' && (()=>{
