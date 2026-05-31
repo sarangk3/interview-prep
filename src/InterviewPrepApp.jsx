@@ -374,10 +374,6 @@ export default function InterviewPrepApp() {
   const MOCK_TURNS = 5;
 
   const startInterview=(r,m)=>{
-    // Gate: AI features require login (cost control)
-    if(!user && (format==='text' || format==='mock')) {
-      setAuthMode('signup'); setAuthError(''); setPage('signin'); return;
-    }
     // Gate: free trial used up — go to subscription page
     if(!hasFreeTrialLeft(format)) {
       setPage('subscribe'); return;
@@ -1582,16 +1578,13 @@ export default function InterviewPrepApp() {
                   <div className="fu d1" style={{marginBottom:24}}>
                     <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Answer format</p>
                     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                      {[{id:'text',label:'Written Response',desc:'AI scores your answer in depth',requiresAuth:true},
-                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline',requiresAuth:false},
-                        {id:'mock',label:'Mock Interview',    desc:'Dynamic back-and-forth with an AI interviewer',requiresAuth:true}].map(f=>(
+                      {[{id:'text',label:'Written Response',desc:'AI scores your answer in depth'},
+                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline'},
+                        {id:'mock',label:'Mock Interview',    desc:'Dynamic back-and-forth with an AI interviewer'}].map(f=>(
                         <div key={f.id} onClick={()=>setFormat(f.id)} style={{flex:1,minWidth:180,padding:'14px 16px',borderRadius:10,cursor:'pointer',
                           border:format===f.id?'2px solid #6366F1':'1px solid #E5E7EB',background:format===f.id?'#F5F3FF':'#fff',transition:'all .15s'}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                            <div style={{display:'flex',alignItems:'center',gap:6}}>
-                              <span style={{fontSize:14,fontWeight:600,color:format===f.id?'#4F46E5':'#111827'}}>{f.label}</span>
-                              {f.requiresAuth&&!user&&<span style={{fontSize:10,fontWeight:600,color:'#9CA3AF',background:'#F3F4F6',padding:'1px 6px',borderRadius:6}}>Sign in</span>}
-                            </div>
+                            <span style={{fontSize:14,fontWeight:600,color:format===f.id?'#4F46E5':'#111827'}}>{f.label}</span>
                             {format===f.id&&<div style={{width:16,height:16,borderRadius:'50%',background:'#6366F1',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#fff'}}>✓</div>}
                           </div>
                           <p style={{fontSize:12,color:'#9CA3AF'}}>{f.desc}</p>
