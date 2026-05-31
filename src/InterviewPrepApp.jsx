@@ -665,7 +665,7 @@ export default function InterviewPrepApp() {
               <div style={{width:28,height:28,borderRadius:7,background:'linear-gradient(135deg,#6366F1,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'#fff'}}>AI</div>
               <span style={{fontWeight:700,fontSize:15,color:'#111827'}}>Interview Prep</span>
             </div>
-            <button onClick={()=>setShowProfileSheet(true)} style={{background:'none',border:'none',cursor:'pointer',width:36,height:36,borderRadius:'50%',background:'#F3F4F6',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <button onClick={()=>setShowProfileSheet(true)} style={{background:'#F3F4F6',border:'none',cursor:'pointer',width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center'}}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
               </svg>
