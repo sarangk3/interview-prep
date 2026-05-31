@@ -60,10 +60,10 @@ const G = () => (
 );
 
 const ROLE_CFG = {
-  'AI Solutions Architect':           {color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',icon:'🧠',label:'LLMs, RAG & AI Systems',   short:'AI Architect', card:'AI Solutions Architect'},
-  'Forward Deployed Engineer':        {color:'#2563EB',bg:'#EFF6FF',border:'#BFDBFE',icon:'🔧',label:'Embedded Customer Builds', short:'FD Engineer', card:'FD Engineer'},
-  'Forward Deployed Product Manager': {color:'#D97706',bg:'#FFFBEB',border:'#FDE68A',icon:'📋',label:'Customer-Embedded PM',     short:'FD PM', card:'FD Product Manager'},
-  'Technical Program Manager':                              {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'Tech PM', card:'Tech Program Manager'},
+  'AI Solutions Architect':           {color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',icon:'🧠',label:'LLMs, RAG & AI Systems',   short:'AI Architect', card:'AI Solutions Architect', interviewer:'Alex Chen', interviewerTitle:'Principal Solutions Architect'},
+  'Forward Deployed Engineer':        {color:'#2563EB',bg:'#EFF6FF',border:'#BFDBFE',icon:'🔧',label:'Embedded Customer Builds', short:'FD Engineer', card:'FD Engineer', interviewer:'Jordan Rivera', interviewerTitle:'Senior Forward Deployed Engineer'},
+  'Forward Deployed Product Manager': {color:'#D97706',bg:'#FFFBEB',border:'#FDE68A',icon:'📋',label:'Customer-Embedded PM',     short:'FD PM', card:'FD Product Manager', interviewer:'Priya Nair', interviewerTitle:'Forward Deployed Product Manager'},
+  'Technical Program Manager':        {color:'#DC2626',bg:'#FEF2F2',border:'#FECACA',icon:'📊',label:'Programs & Delivery',      short:'Tech PM', card:'Tech Program Manager', interviewer:'Marcus Webb', interviewerTitle:'Senior Technical Program Manager'},
 };
 
 /* Pick a question not recently shown, cycles through all before repeating */
@@ -212,6 +212,11 @@ export default function InterviewPrepApp() {
   const [feedbackWorking,setFeedbackWorking] = useState(false);
   const [mockAuthGate,setMockAuthGate]       = useState(false);
   const [writtenAuthGate,setWrittenAuthGate] = useState(false);
+  const [userName,setUserName]               = useState('');
+  const [showNamePrompt,setShowNamePrompt]   = useState(false);
+  const [pendingRole,setPendingRole]         = useState(null);
+  const [ttsEnabled,setTtsEnabled]           = useState(true);
+  const [ttsPlaying,setTtsPlaying]           = useState(false);
   const [mockMessages,setMockMessages]   = useState([]);
   const [mockTurnCount,setMockTurnCount] = useState(0);
   const [mockThinking,setMockThinking]   = useState(false);
@@ -340,6 +345,11 @@ export default function InterviewPrepApp() {
   useEffect(()=>setElapsed(0),[qIndex]);
   useEffect(()=>{ chatEndRef.current?.scrollIntoView({behavior:'smooth'}); },[mockMessages,mockThinking]);
   useEffect(()=>()=>{try{recRef.current?.stop();}catch(e){}},[qIndex,page]);
+  useEffect(()=>{
+    if(page==='interview'&&format==='text'&&sessionQs[qIndex]&&ttsEnabled){
+      setTimeout(()=>speakText(sessionQs[qIndex]),400);
+    }
+  },[qIndex]);
 
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
   const wc=response.trim().split(/\s+/).filter(Boolean).length;
@@ -382,15 +392,43 @@ export default function InterviewPrepApp() {
 
   const MOCK_TURNS = 5;
 
+  const speakText = (text) => {
+    if (!ttsEnabled || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    // Strip markdown-like patterns for cleaner speech
+    const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/#{1,3} /g,'').replace(/\n+/g,' ');
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.rate = 0.95;
+    utt.pitch = 1;
+    // Prefer a natural voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.name.includes('Samantha') || v.name.includes('Daniel') || v.name.includes('Karen') || v.lang === 'en-US');
+    if (preferred) utt.voice = preferred;
+    utt.onstart = () => setTtsPlaying(true);
+    utt.onend = () => setTtsPlaying(false);
+    utt.onerror = () => setTtsPlaying(false);
+    window.speechSynthesis.speak(utt);
+  };
+
+  const stopSpeech = () => { window.speechSynthesis?.cancel(); setTtsPlaying(false); };
+
   const startInterview=(r,m)=>{
-    // Gate: free trial used up — go to subscription page
-    if(!hasFreeTrialLeft(format)) {
-      setPage('subscribe'); return;
-    }
-    // Gate: More than 1 mock interview requires Pro
+    // Gate: free trial used up
+    if(!hasFreeTrialLeft(format)) { setPage('subscribe'); return; }
+    // Gate: more than 1 mock requires Pro
     if(format==='mock' && user && !isPro && (profile?.mocks_completed||0) >= 1) {
       setUpgradeReason('mock'); setShowUpgrade(true); return;
     }
+    // For mock interviews, collect name first if we don't have it
+    if(format==='mock' && !userName) {
+      setPendingRole(r);
+      setShowNamePrompt(true);
+      return;
+    }
+    doStartInterview(r, m);
+  };
+
+  const doStartInterview=(r,m)=>{
     setRole(r);setMode(m);
     setAllResponses([]);setResponse('');setMcChoice(null);
     setResults(null);
@@ -415,11 +453,17 @@ export default function InterviewPrepApp() {
       const newUsed = available.length > 1 ? [...used, idx] : [idx];
       localStorage.setItem(storageKey, JSON.stringify(newUsed));
       const prob = allProblems[idx];
+      const interviewerName = ROLE_CFG[r]?.interviewer || 'Your Interviewer';
+      const interviewerTitle = ROLE_CFG[r]?.interviewerTitle || r;
+      const greeting = userName ? `Hi ${userName}, ` : 'Hi, ';
+      const openingMsg = `${greeting}I'm ${interviewerName}, ${interviewerTitle}. Thanks for taking the time to interview today.\n\n${prob.problem}`;
       setOpeningProblem(prob.problem);
-      setMockMessages([{role:'interviewer',content:prob.problem}]);
+      setMockMessages([{role:'interviewer',content:openingMsg}]);
+      setTimeout(() => speakText(openingMsg), 300);
       setSessionMeta({role:r,mode:'mock',format:'mock',industry,company,sessionId:Math.random().toString(36).slice(2),
         problemTitle:prob.title,keyComponents:prob.keyComponents,
-        hints:prob.hints,idealSolution:prob.idealSolution});
+        hints:prob.hints,idealSolution:prob.idealSolution,
+        interviewerName, interviewerTitle});
     } else {
       const bank=QUESTION_BANK[industry][r][format];
       const key=`${r}-${industry}-${format}`;
@@ -429,6 +473,7 @@ export default function InterviewPrepApp() {
     }
     setMockAuthGate(false);
     setWrittenAuthGate(false);
+    stopSpeech();
     setPage('interview');
   };
 
@@ -453,6 +498,7 @@ export default function InterviewPrepApp() {
       if(!res.ok)throw new Error(data.error||'Failed.');
       const withReply=[...updatedMessages,{role:'interviewer',content:data.reply}];
       setMockMessages(withReply);
+      speakText(data.reply);
       setMockTurnCount(newTurn);
       // After turn 1, gate anonymous users — let them read the first reply then prompt
       if (newTurn === 1 && !user) { setMockAuthGate(true); }
@@ -777,6 +823,25 @@ export default function InterviewPrepApp() {
           </div>
         </div>
       )}
+      {/* ── Name prompt modal ── */}
+      {showNamePrompt && (
+        <div style={{position:'fixed',inset:0,zIndex:600,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+          <div style={{background:'#fff',borderRadius:20,padding:36,maxWidth:380,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,0.2)'}}>
+            <h2 style={{fontSize:20,fontWeight:700,color:'#111827',marginBottom:8}}>Before we begin</h2>
+            <p style={{fontSize:14,color:'#6B7280',marginBottom:24,lineHeight:1.6}}>What should your interviewer call you?</p>
+            <input type="text" placeholder="Your first name" autoFocus value={userName} onChange={e=>setUserName(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&userName.trim()){setShowNamePrompt(false);doStartInterview(pendingRole,'full');}}}
+              style={{width:'100%',padding:'12px 14px',border:'1px solid #E5E7EB',borderRadius:10,fontSize:15,color:'#111827',background:'#F9FAFB',marginBottom:16}}/>
+            <button className="bp" onClick={()=>{if(userName.trim()){setShowNamePrompt(false);doStartInterview(pendingRole,'full');}}} style={{width:'100%',padding:'13px',fontSize:15}}>
+              Start interview →
+            </button>
+            <button onClick={()=>{setShowNamePrompt(false);setUserName('');doStartInterview(pendingRole,'full');}} style={{background:'none',border:'none',cursor:'pointer',width:'100%',marginTop:10,fontSize:13,color:'#9CA3AF',textAlign:'center'}}>
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+
       {mockAuthGate && (
         <div style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
           <div style={{background:'#fff',borderRadius:20,padding:36,maxWidth:420,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,0.25)'}}>
@@ -966,12 +1031,18 @@ export default function InterviewPrepApp() {
               {/* Header */}
               <div style={{background:'#fff',borderBottom:'1px solid #E5E7EB',padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                  <button className="bg" onClick={()=>setPage('home')} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
+                  <button className="bg" onClick={()=>{stopSpeech();setPage('home');}} style={{padding:'5px 12px',fontSize:13}}>← Back</button>
                   {role&&ROLE_CFG[role]&&<div style={{padding:'3px 10px',borderRadius:20,background:ROLE_CFG[role].bg,border:`1px solid ${ROLE_CFG[role].border}`,fontSize:12,fontWeight:600,color:ROLE_CFG[role].color}}>{role}</div>}
                   <div style={{padding:'3px 10px',borderRadius:20,background:'#F9FAFB',border:'1px solid #E5E7EB',fontSize:12,color:'#6B7280'}}>{industry}</div>
-
+                  {sessionMeta?.interviewerName&&<div style={{fontSize:12,color:'#6B7280'}}>with <strong>{sessionMeta.interviewerName}</strong></div>}
                 </div>
-                <div style={{fontSize:13,color:'#9CA3AF',flexShrink:0}}>Round {mockTurnCount} of {MOCK_TURNS}</div>
+                <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+                  <div style={{fontSize:13,color:'#9CA3AF'}}>Round {mockTurnCount} of {MOCK_TURNS}</div>
+                  <button onClick={()=>{ttsPlaying?stopSpeech():null;setTtsEnabled(e=>!e);}} title={ttsEnabled?'Mute interviewer':'Unmute interviewer'}
+                    style={{background:'none',border:'1px solid #E5E7EB',borderRadius:8,padding:'4px 10px',cursor:'pointer',fontSize:12,color:ttsEnabled?'#6366F1':'#9CA3AF',fontWeight:500}}>
+                    {ttsEnabled?'🔊 Audio on':'🔇 Muted'}
+                  </button>
+                </div>
               </div>
               {/* Progress */}
               <div style={{height:3,background:'#F3F4F6',flexShrink:0}}>
@@ -982,7 +1053,7 @@ export default function InterviewPrepApp() {
                 {mockMessages.map((msg,i)=>(
                   <div key={i} style={{display:'flex',flexDirection:'column',alignItems:msg.role==='candidate'?'flex-end':'flex-start'}}>
                     <div style={{fontSize:11,color:'#9CA3AF',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',padding:'0 4px'}}>
-                      {msg.role==='interviewer'?'Interviewer':'You'}
+                      {msg.role==='interviewer'?(sessionMeta?.interviewerName||'Interviewer'):'You'}
                     </div>
                     <div className={`msg-${msg.role}`} style={{padding:'14px 18px',fontSize:14,lineHeight:1.7}}>
                       {msg.content}
@@ -991,7 +1062,7 @@ export default function InterviewPrepApp() {
                 ))}
                 {mockThinking&&(
                   <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start'}}>
-                    <div style={{fontSize:11,color:'#9CA3AF',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',padding:'0 4px'}}>Interviewer</div>
+                    <div style={{fontSize:11,color:'#9CA3AF',marginBottom:4,fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',padding:'0 4px'}}>{sessionMeta?.interviewerName||'Interviewer'}</div>
                     <div className="msg-interviewer" style={{padding:'14px 18px',display:'flex',gap:5,alignItems:'center'}}>
                       <span className="thinking-dot" style={{animationDelay:'0s'}}/>
                       <span className="thinking-dot" style={{animationDelay:'.2s'}}/>
