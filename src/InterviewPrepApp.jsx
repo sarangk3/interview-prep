@@ -199,7 +199,7 @@ export default function InterviewPrepApp() {
   const [upgradeReason,setUpgradeReason] = useState(''); // 'mock'|'hard'|'answers'
   const [upgradeWorking,setUpgradeWorking] = useState(false);
   const [interviews,setInterviews] = useState([]);
-  const [format,setFormat]         = useState('text');
+  const [format,setFormat]         = useState('mock');
   const [company,setCompany]       = useState('Anthropic');
   const [selectedRole,setSelectedRole] = useState(null);
   const [showProfileSheet,setShowProfileSheet] = useState(false);
@@ -1665,9 +1665,9 @@ export default function InterviewPrepApp() {
                   <div className="fu d1" style={{marginBottom:24}}>
                     <p style={{fontSize:13,fontWeight:600,color:'#374151',marginBottom:10}}>Answer format</p>
                     <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-                      {[{id:'text',label:'Written Response',desc:'AI scores your answer in depth'},
-                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline'},
-                        {id:'mock',label:'Mock Interview',    desc:'Dynamic back-and-forth with an AI interviewer'}].map(f=>(
+                      {[{id:'mock',label:'Mock Interview',    desc:'Dynamic back-and-forth with an AI interviewer'},
+                        {id:'text',label:'Written Response',desc:'AI scores your answer in depth'},
+                        {id:'mc',  label:'Multiple Choice',  desc:'Instant scoring, works offline'}].map(f=>(
                         <div key={f.id} onClick={()=>setFormat(f.id)} style={{flex:1,minWidth:180,padding:'14px 16px',borderRadius:10,cursor:'pointer',
                           border:format===f.id?'2px solid #6366F1':'1px solid #E5E7EB',background:format===f.id?'#F5F3FF':'#fff',transition:'all .15s'}}>
                           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
