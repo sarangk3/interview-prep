@@ -333,6 +333,8 @@ export default function InterviewPrepApp() {
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
   const wc=response.trim().split(/\s+/).filter(Boolean).length;
 
+  const isPro = profile?.is_pro && (!profile?.pro_expires_at || new Date(profile.pro_expires_at) > new Date());
+
 
 
   const startUpgrade = async (priceId) => {
