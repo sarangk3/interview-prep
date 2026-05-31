@@ -376,7 +376,10 @@ export default function InterviewPrepApp() {
     if(!user && (format==='text' || format==='mock')) {
       setAuthMode('signup'); setAuthError(''); setPage('signin'); return;
     }
-    // Company selector replaces difficulty, no Pro gate on company selection
+    // Gate: free trial used up — go to subscription page
+    if(!hasFreeTrialLeft(format)) {
+      setPage('subscribe'); return;
+    }
     // Gate: More than 1 mock interview requires Pro
     if(format==='mock' && user && !isPro && (profile?.mocks_completed||0) >= 1) {
       setUpgradeReason('mock'); setShowUpgrade(true); return;
@@ -489,10 +492,24 @@ export default function InterviewPrepApp() {
     else finishInterview(next,'mc');
   };
 
+  // Free trial tracking
+  const FREE_KEYS = { text: 'free_written_done', mock: 'free_mock_done' };
+  const hasFreeTrialLeft = (fmt) => {
+    if (isPro) return true;
+    if (fmt === 'mc') return true; // MC always free
+    return !localStorage.getItem(FREE_KEYS[fmt] || FREE_KEYS.text);
+  };
+  const markFreeTrialUsed = (fmt) => {
+    if (fmt === 'mc' || isPro) return;
+    const key = FREE_KEYS[fmt] || FREE_KEYS.text;
+    localStorage.setItem(key, '1');
+  };
+
   const finishInterview=(responses,fmt2)=>{
     const score=fmt2==='mc'?Math.round((responses.filter(r=>r.isCorrect).length/responses.length)*10):Math.round(responses.reduce((s,r)=>s+r.feedback.overall,0)/responses.length);
     const iv={role,mode,format:fmt2,industry,date:new Date().toISOString(),score,responses};
     setResults(responses);
+    markFreeTrialUsed(fmt2); // mark free trial used after completion
     if(user){ saveInterview(iv); setPage('results'); }
     else { setPendingInterview(iv); setPage('results-gate'); }
   };
@@ -876,6 +893,7 @@ export default function InterviewPrepApp() {
                       const scoreData=await scoreRes.json();
                       if(scoreRes.ok&&scoreData.score){
                         setMockScore(scoreData.score);
+                        markFreeTrialUsed('mock');
                         const iv={role,mode:'mock',format:'mock',industry,company,
                           date:new Date().toISOString(),score:scoreData.score.overall,
                           problemTitle:sessionMeta.problemTitle,messages:mockMessages,mockScore:scoreData.score};
@@ -1416,6 +1434,44 @@ export default function InterviewPrepApp() {
                   </div>
                 );
               })()}
+              {/* ── SUBSCRIPTION PAGE ── */}
+              {page==='subscribe' && (
+                <div style={{maxWidth:520,margin:'0 auto',padding:'48px 24px'}}>
+                  <div style={{textAlign:'center',marginBottom:36}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#6366F1',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:12}}>You have used your free sessions</div>
+                    <h1 style={{fontSize:28,fontWeight:700,color:'#111827',marginBottom:12}}>Unlock unlimited practice</h1>
+                    <p style={{color:'#6B7280',fontSize:15,lineHeight:1.6}}>You have completed your free written response and mock interview. Upgrade to keep practicing with full AI feedback.</p>
+                  </div>
+                  <div style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:14,padding:'20px 24px',marginBottom:24}}>
+                    <p style={{fontSize:12,fontWeight:700,color:'#6D28D9',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Pro includes</p>
+                    {['Unlimited AI-scored written responses','Unlimited mock interviews across all roles','Full score breakdowns with coaching feedback','All 4 roles and all industries','Full session history and score trends'].map((item,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:i<4?10:0}}>
+                        <span style={{color:'#7C3AED',fontWeight:700,flexShrink:0}}>✓</span>
+                        <span style={{fontSize:14,color:'#4C1D95'}}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
+                    <div style={{background:'#fff',border:'1px solid #E5E7EB',borderRadius:12,padding:'20px',textAlign:'center'}}>
+                      <p style={{fontSize:13,color:'#6B7280',marginBottom:6}}>Monthly</p>
+                      <p style={{fontSize:32,fontWeight:700,color:'#111827',marginBottom:2}}>$19</p>
+                      <p style={{fontSize:12,color:'#9CA3AF',marginBottom:16}}>per month</p>
+                      <button className="bp" onClick={()=>startUpgrade('price_monthly')} style={{width:'100%',padding:'11px',fontSize:14}}>Subscribe →</button>
+                    </div>
+                    <div style={{background:'#111827',borderRadius:12,padding:'20px',textAlign:'center',position:'relative'}}>
+                      <div style={{position:'absolute',top:-10,left:'50%',transform:'translateX(-50%)',background:'#F59E0B',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 10px',borderRadius:10,whiteSpace:'nowrap'}}>BEST VALUE</div>
+                      <p style={{fontSize:13,color:'#9CA3AF',marginBottom:6}}>30-day pass</p>
+                      <p style={{fontSize:32,fontWeight:700,color:'#fff',marginBottom:2}}>$49</p>
+                      <p style={{fontSize:12,color:'#6B7280',marginBottom:16}}>one-time</p>
+                      <button onClick={()=>startUpgrade('price_pack')} style={{width:'100%',padding:'11px',fontSize:14,background:'#6366F1',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontWeight:600}}>Get access →</button>
+                    </div>
+                  </div>
+                  <p style={{textAlign:'center',fontSize:12,color:'#D1D5DB',marginBottom:20}}>Multiple choice practice is always free and unlimited.</p>
+                  <button className="bg" onClick={()=>setPage('home')} style={{width:'100%',padding:'12px',fontSize:14}}>← Back to question bank</button>
+                  {!user&&(<p style={{textAlign:'center',fontSize:13,color:'#6B7280',marginTop:16}}>Already subscribed?{' '}<button onClick={()=>{setAuthMode('login');setAuthError('');setPage('signin');}} style={{background:'none',border:'none',cursor:'pointer',color:'#6366F1',fontWeight:600,fontSize:13}}>Sign in</button></p>)}
+                </div>
+              )}
+
               {page==='results-gate' && pendingInterview && (
                 <div style={{maxWidth:480,margin:'0 auto',padding:'48px 24px'}}>
                   {/* Score teaser */}
