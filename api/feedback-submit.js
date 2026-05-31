@@ -9,7 +9,12 @@ export default async function handler(req, res) {
 
   if (!token || !baseId) return res.status(500).json({ error: 'Airtable not configured' });
 
-  const now = new Date();
+  const PAGE_LABELS = {
+    home: 'Question Bank', roles: 'Role Guides', dashboard: 'My Progress',
+    interview: 'During Interview', results: 'Results', 'results-gate': 'Results (Sign-up Gate)',
+    signin: 'Sign In', subscribe: 'Subscription Page',
+  };
+  const pageLabel = PAGE_LABELS[page] || page || 'Unknown';
   const timestamp = now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' });
 
   try {
@@ -25,7 +30,7 @@ export default async function handler(req, res) {
             Type:      type || 'General',
             Message:   message.trim(),
             Email:     email?.trim() || '',
-            Page:      page || '',
+            Page:      pageLabel,
             Timestamp: timestamp,
           },
         }],
