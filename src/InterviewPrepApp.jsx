@@ -601,6 +601,8 @@ export default function InterviewPrepApp() {
     setFeedbackMsg('');
     setShowFeedback(true);
   };
+
+  const handleOAuth = async (provider) => {
     setAuthError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
