@@ -1,46 +1,81 @@
-import { callLLM } from './_llm.js';
 import { createClient } from '@supabase/supabase-js';
 
-const MAX_TURNS = 5;
+const CLAUDE_URL = 'https://api.anthropic.com/v1/messages';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-// Company-specific interviewer personas
+// Use Sonnet for mock interviews - quality matters here
+async function callMockLLM({ system, messages, temperature = 0.7, maxTokens = 400 }) {
+  const claudeKey = process.env.ANTHROPIC_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+
+  if (claudeKey) {
+    try {
+      const res = await fetch(CLAUDE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': claudeKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: maxTokens,
+          system,
+          messages: messages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || `Claude HTTP ${res.status}`);
+      const text = data?.content?.[0]?.text;
+      if (!text) throw new Error('Empty response');
+      console.log('Mock served by: claude-sonnet');
+      return text;
+    } catch (e) {
+      console.warn('Sonnet failed, falling back to Groq:', e.message);
+    }
+  }
+
+  // Groq fallback
+  const msgs = system ? [{ role: 'system', content: system }, ...messages] : messages;
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+    body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: maxTokens, temperature, messages: msgs.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })) }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || 'Groq error');
+  console.log('Mock served by: groq (fallback)');
+  return data?.choices?.[0]?.message?.content;
+}
+
 const COMPANY_CONFIG = {
   Anthropic: {
-    style: `You are a senior interviewer at Anthropic. Anthropic values careful, nuanced reasoning, explicit acknowledgment of uncertainty and tradeoffs, safety considerations in every system design, intellectual honesty, and thinking about second-order effects and failure modes. Push back hard on overconfident claims. Expect candidates to reason out loud and name their assumptions.`,
-    nudge: `Ask the candidate to consider what could go wrong with their approach, or what assumptions they're making that could fail.`,
-    scoring: `Weight reasoning quality and intellectual honesty heavily. Penalize overconfidence. Reward explicit acknowledgment of tradeoffs and failure modes.`,
+    style: `You are a senior technical interviewer at Anthropic. You think carefully about safety, tradeoffs, and second-order effects. You push back on overconfident claims. You expect candidates to reason out loud and name their assumptions. You are intellectually rigorous but not hostile.`,
+    closing: `At Anthropic we weight careful reasoning and acknowledgment of uncertainty very highly.`,
   },
   OpenAI: {
-    style: `You are a senior interviewer at OpenAI. OpenAI values speed and iteration, strong opinions on impact, practical deployment thinking, comfort with ambiguity, and scale. Push candidates to make concrete decisions quickly rather than endlessly exploring options.`,
-    nudge: `Push the candidate to commit to a specific approach and explain how they would ship it in the next 30 days.`,
-    scoring: `Weight decisiveness, practical thinking, and impact orientation. Penalize analysis paralysis. Reward concrete proposals with clear success metrics.`,
+    style: `You are a senior technical interviewer at OpenAI. You value decisiveness and impact. You push candidates to make concrete decisions rather than endlessly exploring options. You want to know: what would you actually ship, and by when?`,
+    closing: `At OpenAI we weight speed of decision-making and practical impact orientation very highly.`,
   },
   Google: {
-    style: `You are a senior interviewer at Google. Google values systems thinking at massive scale, data-driven decisions, technical depth, structured problem-solving, and cross-functional awareness. Push candidates to think about edge cases, scale bottlenecks, and measurement.`,
-    nudge: `Ask the candidate how they would measure success and what happens when this system needs to handle 100x the current volume.`,
-    scoring: `Weight structured thinking, scale considerations, and measurement plans. Penalize hand-wavy answers without metrics. Reward explicit edge case handling.`,
+    style: `You are a senior technical interviewer at Google. You value structured thinking, scale, and measurement. You push for specific metrics, edge case handling, and explicit tradeoffs. You expect STAR-style structure.`,
+    closing: `At Google we weight structured thinking, data-driven decisions, and scale awareness very highly.`,
   },
   Meta: {
-    style: `You are a senior interviewer at Meta. Meta values social impact at scale, open source mindset, speed and pragmatism, cross-platform thinking, and real-world adoption. Push candidates to think about user behavior, network effects, and adoption.`,
-    nudge: `Ask the candidate how real users will actually adopt and engage with this, and what the network effects look like.`,
-    scoring: `Weight user impact thinking, pragmatism, and adoption strategy. Penalize over-engineering. Reward network effect thinking.`,
+    style: `You are a senior technical interviewer at Meta. You value pragmatism, user impact, and network effects. You push candidates to think about real user behavior and adoption rather than technical elegance.`,
+    closing: `At Meta we weight user impact thinking and pragmatic delivery over perfect engineering very highly.`,
   },
   Microsoft: {
-    style: `You are a senior interviewer at Microsoft. Microsoft values enterprise readiness, Azure and cloud-native thinking, integration with the Microsoft ecosystem, partner and customer obsession, and responsible AI with governance. Push candidates to think about enterprise procurement, compliance, and ecosystem integration.`,
-    nudge: `Ask the candidate how a Fortune 500 enterprise IT team would approve and deploy this solution, and what compliance requirements apply.`,
-    scoring: `Weight enterprise readiness, compliance thinking, and ecosystem integration. Penalize consumer-only thinking. Reward governance considerations.`,
+    style: `You are a senior technical interviewer at Microsoft. You value enterprise readiness, compliance awareness, and ecosystem integration. You push candidates to think about how their solution fits into existing enterprise environments.`,
+    closing: `At Microsoft we weight enterprise readiness, security, and ecosystem integration very highly.`,
   },
   Amazon: {
-    style: `You are a senior interviewer at Amazon. Amazon's Leadership Principles drive everything: customer obsession (start with the customer, work backwards), ownership (think like an owner), invent and simplify, dive deep (get into the details), and deliver results. Expect candidates to anchor every decision to customer impact and be specific about metrics, owners, and timelines.`,
-    nudge: `Ask the candidate to start from the customer perspective — who is the customer, what is their specific problem, and how does this solution measurably improve their situation?`,
-    scoring: `Weight customer-backward thinking, ownership mentality, and specificity about metrics. Penalize vague answers. Reward explicit customer impact framing.`,
+    style: `You are a senior technical interviewer at Amazon. You anchor everything to Leadership Principles, especially Customer Obsession, Ownership, and Dive Deep. You push candidates to start with the customer and work backwards. You want specific metrics and clear ownership.`,
+    closing: `At Amazon we weight customer-backward thinking, ownership, and specificity about results very highly.`,
   },
   Nvidia: {
-    style: `You are a senior interviewer at Nvidia. Nvidia values deep technical expertise in compute and parallelism, developer ecosystem thinking, performance obsession, full-stack platform awareness (CUDA, cuDNN, Triton), and AI infrastructure at scale. Push candidates to think about compute efficiency, hardware constraints, and developer experience.`,
-    nudge: `Ask the candidate where the compute bottleneck is in their proposed solution and how they would profile and optimize it.`,
-    scoring: `Weight technical depth, compute efficiency thinking, and developer experience. Penalize hardware-ignorant solutions. Reward explicit performance bottleneck analysis.`,
+    style: `You are a senior technical interviewer at Nvidia. You value deep technical depth, compute efficiency, and developer ecosystem thinking. You push candidates to identify performance bottlenecks and think about hardware constraints.`,
+    closing: `At Nvidia we weight technical depth, compute efficiency awareness, and developer experience very highly.`,
   },
 };
+
+const MAX_TURNS = 5;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
@@ -64,7 +99,7 @@ export default async function handler(req, res) {
           const today = new Date().toISOString().split('T')[0];
           const { data: usage } = await sb.from('daily_usage').select('ai_answers').eq('user_id', user.id).eq('date', today).single();
           const count = usage?.ai_answers || 0;
-          const limit = isPro ? 999 : 20;
+          const limit = isPro ? 999 : 25;
           if (count >= limit) return res.status(429).json({ error: "You've used all your free AI answers for today. Upgrade to Pro for unlimited." });
           await sb.from('daily_usage').upsert({ user_id: user.id, date: today, ai_answers: count + 1 }, { onConflict: 'user_id,date' });
         }
@@ -79,75 +114,130 @@ export default async function handler(req, res) {
     } catch (e) { console.warn('Mock auth check:', e.message); }
   }
 
-  const { mode, messages, role, industry, company = 'Anthropic', turn, maxTurns, openingProblem, keyComponents, hints } = req.body;
+  const { mode, messages, role, industry, company = 'Anthropic', turn, openingProblem, keyComponents, hints } = req.body;
   const cfg = COMPANY_CONFIG[company] || COMPANY_CONFIG.Anthropic;
   const industryCtx = industry && industry !== 'General' ? ` in the ${industry} industry` : '';
-  const isFinalTurn = turn >= MAX_TURNS;
-  const isLastTwo = turn >= MAX_TURNS - 1;
 
   try {
     if (mode === 'score') {
-      const transcript = messages.map(m => `${m.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${m.content}`).join('\n\n');
+      const transcript = messages
+        .filter(m => m.role !== 'system')
+        .map(m => `${m.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${m.content}`)
+        .join('\n\n');
 
-      const scorePrompt = `You evaluated a mock interview for a ${role} role${industryCtx} targeting ${company}.
-
-${cfg.scoring}
+      const scorePrompt = `You scored a mock ${role} interview${industryCtx} at ${company}.
 
 Opening problem: "${openingProblem}"
 
 Key components a strong answer should cover:
 ${(keyComponents || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
-Full conversation:
+Full transcript:
 ${transcript}
 
-Score the candidate (1-10, honest):
-- structure, depth, problem_solving, adaptability, communication
+Score honestly (1-10). Do not inflate. A candidate who identified 2 of 5 key components gets a 4-5, not a 7.
 
 Reply ONLY in this JSON (no markdown):
-{"structure":7,"depth":6,"problem_solving":7,"adaptability":6,"communication":8,"overall":7,"strengths":["s1","s2","s3"],"improvements":["g1","g2","g3"],"summary":"2-3 sentences on performance.","components_covered":["what they got"],"components_missed":["what they missed"]}`;
+{"structure":0,"depth":0,"problem_solving":0,"adaptability":0,"communication":0,"overall":0,"strengths":["s1","s2","s3"],"improvements":["g1","g2","g3"],"summary":"2-3 honest sentences on performance.","components_covered":["what they got right"],"components_missed":["what they missed"]}`;
 
-      const { text } = await callLLM({ userMessages: [{ role: 'user', content: scorePrompt }], temperature: 0.2, maxTokens: 700 });
+      const text = await callMockLLM({
+        system: 'You are a strict, honest interviewer scoring a mock interview. Return only valid JSON.',
+        messages: [{ role: 'user', content: scorePrompt }],
+        temperature: 0.2,
+        maxTokens: 600,
+      });
+
       const match = text.match(/\{[\s\S]*\}/);
       const score = JSON.parse(match ? match[0] : text);
       return res.status(200).json({ score });
 
     } else {
-      // Pick the progressive hint for this turn
-      const currentHint = hints && hints[turn - 1] ? hints[turn - 1] : null;
+      // Build a running summary of what candidate has covered so far
+      const candidateTurns = messages.filter(m => m.role === 'candidate');
+      const coveredSoFar = candidateTurns.map(m => m.content).join(' ');
 
-      const system = `You are a senior interviewer at ${company} conducting a mock interview for a ${role} role${industryCtx}.
+      // Determine which key components are still unaddressed (rough heuristic)
+      const uncoveredComponents = (keyComponents || []).filter(comp => {
+        const keywords = comp.toLowerCase().split(' ').filter(w => w.length > 4);
+        return !keywords.some(kw => coveredSoFar.toLowerCase().includes(kw));
+      });
+
+      const isFirstTurn = turn === 1;
+      const isSecondToLast = turn === MAX_TURNS - 1;
+      const isFinalTurn = turn >= MAX_TURNS;
+
+      let turnInstruction = '';
+
+      if (isFirstTurn) {
+        turnInstruction = `This is the opening turn. The candidate has just given their first response. 
+Acknowledge one specific thing they said (quote a phrase back to them to show you listened), then identify the MOST important gap in their answer and probe it with one sharp question.
+Keep your response to 3-4 sentences maximum. End with exactly one question.`;
+
+      } else if (isFinalTurn) {
+        const missed = uncoveredComponents.slice(0, 2).join(' and ');
+        turnInstruction = `This is the final turn (${turn} of ${MAX_TURNS}).
+After the candidate answers, do this in order:
+1. Acknowledge their final point in one sentence.
+2. Give a brief honest debrief (2-3 sentences): what they handled well, and — critically — what key element was missing from their answer. Be specific: name the concept they should have raised.
+3. Close warmly: "That's all the time we have. Thank you for walking me through this."
+
+${missed ? `The candidate has not yet addressed: ${missed}. Name this specifically in your debrief.` : 'The candidate covered the key components well — acknowledge this.'}
+
+This debrief is the most valuable part of the interview for the candidate. Be direct and honest, not vague.`;
+
+      } else if (isSecondToLast) {
+        const hint = hints && hints[turn - 1] ? hints[turn - 1] : null;
+        const missed = uncoveredComponents[0];
+        turnInstruction = `This is turn ${turn} of ${MAX_TURNS} — the second-to-last round.
+The candidate is running out of turns and has not yet addressed: ${missed || 'key depth in their approach'}.
+
+You must now guide them directly toward it. Do NOT just ask a vague follow-up.
+${hint ? `Ask directly: "${hint}"` : `Tell them: "You haven't addressed [specific component] yet — how would you handle that?" Name the exact gap.`}
+
+Be direct. This is their last real chance to demonstrate they understand the full problem.
+2-3 sentences, end with one specific question.`;
+
+      } else {
+        const hint = hints && hints[turn - 1] ? hints[turn - 1] : null;
+        turnInstruction = `This is turn ${turn} of ${MAX_TURNS}.
+Build on what the candidate just said — reference something specific from their last response before asking your question. Do NOT repeat questions you already asked.
+
+${uncoveredComponents.length > 0
+          ? `The candidate has not addressed: ${uncoveredComponents[0]}. Steer toward this area.`
+          : 'Probe for more depth on what they have covered.'}
+
+${hint ? `If they haven't touched on it: "${hint}"` : ''}
+
+Keep it conversational and specific. 2-4 sentences, one question at the end.`;
+      }
+
+      const system = `You are a senior interviewer at ${company} conducting a structured mock interview for a ${role} role${industryCtx}.
 
 ${cfg.style}
 
-Opening problem you gave: "${openingProblem}"
+The opening problem you presented: "${openingProblem}"
 
-The ideal solution has these key components — you know them, the candidate does not:
+Key components a strong answer must cover (you know these, the candidate does not):
 ${(keyComponents || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
-Your job: ask questions that steer the candidate toward these components WITHOUT revealing them directly.
+INTERVIEW CONDUCT RULES:
+- React specifically to what the candidate just said in their most recent response. Always.
+- Never reveal the key components list directly.
+- Never say "great answer" or be sycophantic. Acknowledge, then push deeper.
+- Your tone: warm but rigorous. Like a good mentor who tells you the truth.
+- If the candidate is on the right track, confirm it briefly and push to the next level.
+- If the candidate is off-track, redirect clearly without being harsh.
 
-Turn ${turn} of ${MAX_TURNS}.
+${turnInstruction}`;
 
-${isFinalTurn
-  ? "This is the final turn. Acknowledge their answer in one sentence, then close: 'That brings us to the end of our session — thank you for your time.'"
-  : isLastTwo
-    ? `IMPORTANT: This is one of the final rounds. If the candidate hasn't addressed key components yet, now is the time to guide them more directly. ${cfg.nudge} Then ask one focused follow-up question.`
-    : `${currentHint ? `If the candidate hasn't addressed this area yet, steer toward it: "${currentHint}"` : 'Probe the most important gap in their answer so far.'}
-React specifically to what the candidate just said. ${turn === 1 ? 'Acknowledge their opening in one sentence, then probe the most critical gap.' : 'Go deeper on a specific detail they haven\'t fully addressed.'}
-2-4 sentences ending with ONE sharp question.`}
+      const convMessages = messages
+        .filter(m => m.role !== 'system')
+        .map(m => ({
+          role: m.role === 'interviewer' ? 'assistant' : 'user',
+          content: m.content,
+        }));
 
-Stay in character as a ${company} interviewer at all times.`;
-
-      const userMessages = [];
-      for (let i = 1; i < messages.length; i++) {
-        userMessages.push({
-          role: messages[i].role === 'candidate' ? 'user' : 'model',
-          content: messages[i].content,
-        });
-      }
-
-      const { text } = await callLLM({ system, userMessages, temperature: 0.7, maxTokens: 300 });
+      const text = await callMockLLM({ system, messages: convMessages, temperature: 0.7, maxTokens: 350 });
       return res.status(200).json({ reply: text.trim() });
     }
   } catch (err) {
