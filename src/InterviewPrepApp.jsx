@@ -48,7 +48,7 @@ const G = () => (
       .mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:#9CA3AF;cursor:pointer;background:none;border:none;padding:0;transition:color .15s;}
       .mob-tab.on{color:#6366F1;}
       .mob-tab svg{width:22px;height:22px;stroke-width:1.8;fill:none;stroke:currentColor;}
-      .mob-header{display:flex;position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #E5E7EB;padding:12px 16px;align-items:center;justify-content:space-between;}
+      .mob-header{display:flex;background:#fff;border-bottom:1px solid #E5E7EB;padding:12px 16px;align-items:center;justify-content:space-between;flex-shrink:0;}
       .prof-sheet{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;justify-content:flex-end;}
       .prof-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.5);}
       .prof-panel{position:relative;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 36px;z-index:1;}
@@ -640,6 +640,9 @@ export default function InterviewPrepApp() {
       )}
       <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
         <Sidebar page={page} setPage={(p)=>{setPage(p);setSelectedRole(null);setActiveTab('role');}} interviews={interviews} user={user} onLogout={handleLogout} onSignIn={()=>{setAuthMode('signup');setAuthError('');setPage('signin');}} isPro={isPro} onUpgrade={()=>{setUpgradeReason('answers');setShowUpgrade(true);}}/>
+
+        {/* ── Right column: mobile header + page content ── */}
+        <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
 
         {/* ── Mobile header (top bar) ── */}
         {page!=='interview' && (
@@ -1756,6 +1759,7 @@ export default function InterviewPrepApp() {
 
             </div>
           )}
+        </div>
         </div>
       </div>
       </>)}
