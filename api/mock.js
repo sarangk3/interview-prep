@@ -120,31 +120,31 @@ export default async function handler(req, res) {
 
   try {
     if (mode === 'score') {
-      const transcript = messages
-        .filter(m => m.role !== 'system')
-        .map(m => `${m.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${m.content}`)
+      // Only send last 10 messages for scoring - enough context, fewer tokens
+      const recentMessages = messages.filter(m => m.role !== 'system').slice(-10);
+      const transcript = recentMessages
+        .map(m => `${m.role === 'interviewer' ? 'I' : 'C'}: ${m.content}`)
         .join('\n\n');
 
-      const scorePrompt = `You scored a mock ${role} interview${industryCtx} at ${company}.
+      const scorePrompt = `Score this ${role} mock interview${industryCtx} at ${company}.
 
-Opening problem: "${openingProblem}"
-
-Key components a strong answer should cover:
+Problem: "${openingProblem}"
+Must-cover components:
 ${(keyComponents || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
-Full transcript:
+Transcript (I=Interviewer, C=Candidate):
 ${transcript}
 
-Score honestly (1-10). Do not inflate. A candidate who identified 2 of 5 key components gets a 4-5, not a 7.
+Score 1-10 honestly. 2 of 5 components covered = 4-5, not 7. No inflation.
 
-Reply ONLY in this JSON (no markdown):
-{"structure":0,"depth":0,"problem_solving":0,"adaptability":0,"communication":0,"overall":0,"strengths":["s1","s2","s3"],"improvements":["g1","g2","g3"],"summary":"2-3 honest sentences on performance.","components_covered":["what they got right"],"components_missed":["what they missed"]}`;
+JSON only:
+{"structure":0,"depth":0,"problem_solving":0,"adaptability":0,"communication":0,"overall":0,"strengths":["s1","s2"],"improvements":["g1","g2"],"summary":"2 honest sentences.","components_covered":["what they got"],"components_missed":["what they missed"]}`;
 
       const text = await callMockLLM({
-        system: 'You are a strict, honest interviewer scoring a mock interview. Return only valid JSON.',
+        system: 'Score this mock interview honestly. Return only valid JSON, no markdown.',
         messages: [{ role: 'user', content: scorePrompt }],
         temperature: 0.2,
-        maxTokens: 600,
+        maxTokens: 500,
       });
 
       const match = text.match(/\{[\s\S]*\}/);
@@ -169,76 +169,42 @@ Reply ONLY in this JSON (no markdown):
       let turnInstruction = '';
 
       if (isFirstTurn) {
-        turnInstruction = `This is the opening turn. The candidate has just given their first response. 
-Acknowledge one specific thing they said (quote a phrase back to them to show you listened), then identify the MOST important gap in their answer and probe it with one sharp question.
-Keep your response to 3-4 sentences maximum. End with exactly one question.`;
+        turnInstruction = `Turn 1 of ${MAX_TURNS}. Quote one specific phrase from their response to show you listened. Identify the biggest gap and probe it. Max 3 sentences + 1 question.`;
 
       } else if (isFinalTurn) {
         const missed = uncoveredComponents.slice(0, 2).join(' and ');
-        turnInstruction = `This is the final turn (${turn} of ${MAX_TURNS}).
-After the candidate answers, do this in order:
-1. Acknowledge their final point in one sentence.
-2. Give a brief honest debrief (2-3 sentences): what they handled well, and — critically — what key element was missing from their answer. Be specific: name the concept they should have raised.
-3. Close warmly: "That's all the time we have. Thank you for walking me through this."
-
-${missed ? `The candidate has not yet addressed: ${missed}. Name this specifically in your debrief.` : 'The candidate covered the key components well — acknowledge this.'}
-
-This debrief is the most valuable part of the interview for the candidate. Be direct and honest, not vague.`;
+        turnInstruction = `Final turn ${turn} of ${MAX_TURNS}. Acknowledge their answer in 1 sentence. Then debrief honestly: what they handled well + specifically what key concept was missing (be direct, name it). ${missed ? `They missed: ${missed}.` : 'They covered the key components well.'} Close: "That's all the time we have. Thank you."`;
 
       } else if (isSecondToLast) {
-        const hint = hints && hints[turn - 1] ? hints[turn - 1] : null;
         const missed = uncoveredComponents[0];
-        turnInstruction = `This is turn ${turn} of ${MAX_TURNS} — the second-to-last round.
-The candidate is running out of turns and has not yet addressed: ${missed || 'key depth in their approach'}.
-
-You must now guide them directly toward it. Do NOT just ask a vague follow-up.
-${hint ? `Ask directly: "${hint}"` : `Tell them: "You haven't addressed [specific component] yet — how would you handle that?" Name the exact gap.`}
-
-Be direct. This is their last real chance to demonstrate they understand the full problem.
-2-3 sentences, end with one specific question.`;
+        const hint = hints?.[turn - 1];
+        turnInstruction = `Turn ${turn} of ${MAX_TURNS} — second to last. Candidate hasn't addressed: ${missed || 'key depth'}. Guide them directly now — don't hint, ask specifically: ${hint ? `"${hint}"` : `"You haven't addressed [${missed}] — how would you approach that?"`}. 2-3 sentences + 1 direct question.`;
 
       } else {
-        const hint = hints && hints[turn - 1] ? hints[turn - 1] : null;
-        turnInstruction = `This is turn ${turn} of ${MAX_TURNS}.
-Build on what the candidate just said — reference something specific from their last response before asking your question. Do NOT repeat questions you already asked.
-
-${uncoveredComponents.length > 0
-          ? `The candidate has not addressed: ${uncoveredComponents[0]}. Steer toward this area.`
-          : 'Probe for more depth on what they have covered.'}
-
-${hint ? `If they haven't touched on it: "${hint}"` : ''}
-
-Keep it conversational and specific. 2-4 sentences, one question at the end.`;
+        const hint = hints?.[turn - 1];
+        turnInstruction = `Turn ${turn} of ${MAX_TURNS}. Reference something specific from their last response before asking your question. ${uncoveredComponents.length > 0 ? `Steer toward: ${uncoveredComponents[0]}.` : 'Push for more depth.'} ${hint ? `If untouched: "${hint}"` : ''} 2-3 sentences + 1 question.`;
       }
 
-      const system = `You are a senior interviewer at ${company} conducting a structured mock interview for a ${role} role${industryCtx}.
+      const system = `${role} interviewer at ${company}${industryCtx}. ${cfg.style}
 
-${cfg.style}
-
-The opening problem you presented: "${openingProblem}"
-
-Key components a strong answer must cover (you know these, the candidate does not):
+Problem: "${openingProblem}"
+Target components (candidate doesn't know these):
 ${(keyComponents || []).map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
-INTERVIEW CONDUCT RULES:
-- React specifically to what the candidate just said in their most recent response. Always.
-- Never reveal the key components list directly.
-- Never be sycophantic ("great answer!", "excellent point!") but do briefly acknowledge when the candidate is on the right track before pushing deeper.
-- Your tone: a senior colleague who genuinely wants you to succeed, but will not let you off the hook. Recognize this is a high-stakes situation for the candidate — be human about it without losing rigor.
-- If the candidate is on the right track, say so clearly ("You're thinking about this the right way — now go deeper on...") then push to the next level.
-- If the candidate is off-track, redirect clearly and kindly ("Let's reframe this a bit — what if you started from...").
-- When the candidate struggles, guide rather than punish. The goal is to stretch them, not embarrass them.
+Rules: React to what candidate just said. Never reveal components. No sycophancy ("great answer!"). Warm but rigorous — you want them to succeed but won't let them off the hook. If on track say so briefly then push deeper. If off track redirect kindly.
 
 ${turnInstruction}`;
 
-      const convMessages = messages
-        .filter(m => m.role !== 'system')
-        .map(m => ({
-          role: m.role === 'interviewer' ? 'assistant' : 'user',
-          content: m.content,
-        }));
+      // Only send last 4 messages — enough context for natural flow, saves tokens
+      const recentMessages = messages.filter(m => m.role !== 'system').slice(-4);
+      const convMessages = recentMessages.map(m => ({
+        role: m.role === 'interviewer' ? 'assistant' : 'user',
+        content: m.content,
+      }));
 
-      const text = await callMockLLM({ system, messages: convMessages, temperature: 0.7, maxTokens: 350 });
+      // Shorter max tokens for early turns, more for final debrief
+      const maxTok = isFinalTurn ? 350 : 220;
+      const text = await callMockLLM({ system, messages: convMessages, temperature: 0.7, maxTokens: maxTok });
       return res.status(200).json({ reply: text.trim() });
     }
   } catch (err) {
