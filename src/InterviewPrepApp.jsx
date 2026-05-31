@@ -399,26 +399,42 @@ export default function InterviewPrepApp() {
 
   const MOCK_TURNS = 5;
 
-  const speakText = async (text) => {
+  const speakText = async (text, roleOverride) => {
     if (!ttsEnabled) return;
     stopSpeech();
+    const speakRole = roleOverride || role;
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, role }),
+        body: JSON.stringify({ text, role: speakRole }),
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
       const blob = await res.blob();
+      if (blob.size < 100) throw new Error('Empty audio response');
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.onplay = () => setTtsPlaying(true);
       audio.onended = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
       audio.onerror = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
-      // Store ref so we can stop it
       window._ttsAudio = audio;
       await audio.play();
-    } catch(e) { setTtsPlaying(false); }
+    } catch(e) {
+      console.warn('ElevenLabs TTS failed, falling back to browser TTS:', e.message);
+      // Browser TTS fallback
+      if (window.speechSynthesis) {
+        const clean = text.replace(/\*\*/g,'').replace(/\*/g,'').replace(/\n+/g,' ');
+        const utt = new SpeechSynthesisUtterance(clean);
+        utt.rate = 0.92; utt.pitch = 1.05;
+        const voices = window.speechSynthesis.getVoices();
+        const preferred = voices.find(v => v.name.includes('Samantha') || v.name.includes('Daniel') || (v.lang==='en-US' && v.localService));
+        if (preferred) utt.voice = preferred;
+        utt.onstart = () => setTtsPlaying(true);
+        utt.onend = () => setTtsPlaying(false);
+        window.speechSynthesis.speak(utt);
+      }
+      setTtsPlaying(false);
+    }
   };
 
   const stopSpeech = () => {
@@ -509,7 +525,7 @@ export default function InterviewPrepApp() {
       const openingMsg = `${greeting}I'm ${interviewerName}, ${interviewerTitle}. Thanks for taking the time to interview today.\n\n${prob.problem}`;
       setOpeningProblem(prob.problem);
       setMockMessages([{role:'interviewer',content:openingMsg}]);
-      setTimeout(() => speakText(openingMsg), 300);
+      setTimeout(() => speakText(openingMsg, r), 300);
       setSessionMeta({role:r,mode:'mock',format:'mock',industry,company,sessionId:Math.random().toString(36).slice(2),
         problemTitle:prob.title,keyComponents:prob.keyComponents,
         hints:prob.hints,idealSolution:prob.idealSolution,

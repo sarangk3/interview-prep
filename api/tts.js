@@ -19,7 +19,11 @@ export default async function handler(req, res) {
   if (!text?.trim()) return res.status(400).json({ error: 'No text provided' });
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ElevenLabs not configured' });
+  if (!apiKey) {
+    console.error('ELEVENLABS_API_KEY not set');
+    return res.status(500).json({ error: 'ElevenLabs not configured' });
+  }
+  console.log(`TTS: role=${role}, voice=${VOICE_MAP[role]||DEFAULT_VOICE}, chars=${text?.length}`);
 
   const voiceId = VOICE_MAP[role] || DEFAULT_VOICE;
 
