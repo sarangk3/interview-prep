@@ -915,6 +915,135 @@ export default function InterviewPrepApp() {
 
               {/* ── ROLES GUIDE ── */}
               {page==='roles' && (()=>{
+                const [activeTab, setActiveTab] = React.useState('role');
+
+                const INTERVIEW_GUIDES = {
+                  'AI Solutions Architect': {
+                    process: [
+                      { stage: 'Recruiter screen', duration: '30 min', what: 'Background, motivation, why this company. Expect to explain your experience with AI systems and enterprise customers. Prepare a crisp 2-minute story of your most technical customer-facing project.' },
+                      { stage: 'Technical screen', duration: '45-60 min', what: 'AI system design or RAG architecture question. You will be asked to design something end-to-end: choose a vector database, chunking strategy, embedding model, retrieval approach. Think out loud. They want your reasoning, not just the answer.' },
+                      { stage: 'Case study or whiteboard', duration: '60 min', what: 'A real customer scenario: "A hospital wants to give doctors AI-assisted chart summarization. Walk us through the architecture." You are evaluated on how you handle ambiguity, ask clarifying questions, and structure a response that is both technically sound and explainable to a non-technical stakeholder.' },
+                      { stage: 'Behavioral loop', duration: '3-4 rounds', what: 'Expect STAR-format questions on handling difficult customers, failed projects, and technical disagreements. Most AI SA interviews heavily weight customer-handling stories.' },
+                      { stage: 'Hiring manager final', duration: '45 min', what: 'Mission alignment, team fit, and any lingering technical questions. Prepare questions about the specific deployment challenges their enterprise customers face.' },
+                    ],
+                    framework: {
+                      name: 'DISCOVER framework for AI architecture questions',
+                      steps: [
+                        { label: 'D - Define the problem', desc: 'Restate what success looks like in concrete terms. "We want doctors to retrieve relevant patient history in under 2 seconds with at least 90% recall on critical diagnoses." Interviewers reward candidates who set measurable goals before picking a solution.' },
+                        { label: 'I - Inventory existing systems', desc: 'Ask what data exists, in what format, and where it lives. EMR system? PDF discharge notes? Structured SQL or unstructured text? The architecture depends entirely on the answer. This question alone signals SA-level thinking.' },
+                        { label: 'S - Select the approach', desc: 'Explicitly choose between RAG, fine-tuning, function calling, or hybrid. State why: "Given the volume of proprietary clinical notes and the need for real-time updates, RAG over fine-tuning because retraining costs are prohibitive and the knowledge base changes daily."' },
+                        { label: 'C - Component design', desc: 'Walk through ingestion pipeline, chunking strategy, embedding model choice, vector store selection, retrieval method (dense, sparse, or hybrid), reranking, and prompt construction. Be specific about the tradeoffs at each step.' },
+                        { label: 'O - Observability and evals', desc: 'Define how you will know if it is working: retrieval recall@5, answer faithfulness (RAGAS score), hallucination rate, latency p95. This separates candidates who have shipped production systems from those who have only built prototypes.' },
+                        { label: 'V - Validate with stakeholders', desc: 'Explain how you would run a pilot: which user group, what success criteria, how long before you decide to expand or kill it.' },
+                        { label: 'E - Edge cases and failure modes', desc: 'What happens when retrieval returns nothing relevant? When the model hallucinates a drug interaction? What are the fallback behaviors? Anthropic interviews specifically probe this step.' },
+                        { label: 'R - Roadmap the next iteration', desc: 'Briefly describe what v2 looks like. Agentic retrieval? Fine-tuned reranker? This shows you think beyond the immediate deliverable.' },
+                      ],
+                    },
+                    exampleQ: {
+                      question: 'A large hospital system wants to deploy an AI assistant that can answer clinician questions using 10 years of internal clinical protocols, research papers, and patient outcome data. How would you architect this?',
+                      strongAnswer: 'Start by clarifying: are we doing real-time patient queries during a clinical encounter, or asynchronous research support? That changes the latency requirement entirely. Assuming real-time: I would build a hybrid RAG system. Clinical protocols are structured and high-trust so they get chunked at the section level and stored in pgvector with metadata filters for department and version. Research papers are chunked at the paragraph level. Patient outcome data is never stored in the vector index due to PHI, instead it is queried via a secure SQL tool call. I would use a reranker (Cohere Rerank or a fine-tuned cross-encoder) to improve precision before passing retrieved context to the model. For evals, I would run RAGAS against a golden dataset of 200 clinician-verified Q&A pairs, targeting answer faithfulness above 0.85 and context recall above 0.80. I would not go to production until we hit those numbers in a 30-day pilot with 20 clinicians.',
+                      why: 'This answer earns high marks because it asks a clarifying question first, makes explicit architectural choices with stated reasons, handles the PHI constraint specifically rather than ignoring it, and defines concrete eval targets before launch.',
+                    },
+                    reading: [
+                      { title: 'Anthropic Applied AI team blog', url: 'https://www.anthropic.com/news', note: 'Read every enterprise deployment post. These are the exact use cases you will be asked to architect.' },
+                      { title: 'RAGAS documentation', url: 'https://docs.ragas.io', note: 'The standard eval framework for RAG systems. Know recall, faithfulness, and context precision cold.' },
+                      { title: 'IGotAnOffer: GenAI System Design', url: 'https://igotanoffer.com/en/advice/generative-ai-system-design-interview', note: 'Best free resource for AI system design interview prep. Covers RAG, agents, reliability, and evaluation.' },
+                    ],
+                  },
+                  'Forward Deployed Engineer': {
+                    process: [
+                      { stage: 'Recruiter screen', duration: '30 min', what: 'Why Palantir or the specific company, what defines your job search, and which role (SWE vs FDE) fits you better. Read the Q4 shareholder letter before this call. Use the vocabulary: ontology, transforms, AIP, Phase 4 adoption. Candidates who stay abstract get filtered out here.' },
+                      { stage: 'Online assessment', duration: '90 min (Palantir)', what: 'Three questions: one coding problem (medium-hard), one SQL question focused on real-world data manipulation (window functions, multi-step transforms, not textbook joins), and one API integration task. Palantir uses HackerRank. The bar is senior-engineer level.' },
+                      { stage: 'Decomposition round', duration: '60 min', what: 'A Palantir-specific round that tests problem structuring. You are given a real-world messy problem (no clean requirements) and asked to break it into components, identify the core constraint, and propose a phased solution. Most candidates fail this because they try to code instead of structure.' },
+                      { stage: 'Learning round', duration: '60 min', what: 'Another Palantir-specific round. You are given a real codebase or system you have never seen and asked to understand it, modify it, or debug it. Tests how quickly you learn unfamiliar systems under pressure.' },
+                      { stage: 'System design', duration: '60 min', what: 'Distributed systems design at the scale Palantir operates. Correctness and fault tolerance are first-class constraints. Candidates who treat these as afterthoughts do not advance.' },
+                      { stage: 'Hiring manager final', duration: '60 min', what: 'Mission alignment, project ownership mindset, and revisiting any open questions. Prepare stories about owning outcomes end-to-end, not just completing tasks.' },
+                    ],
+                    framework: {
+                      name: 'SCOPE framework for Decomposition questions',
+                      steps: [
+                        { label: 'S - Situation clarity', desc: 'Spend the first 5 minutes asking questions until you can state the problem in one sentence. "A defense agency wants to reduce the time analysts spend finding relevant intelligence reports from 4 hours to 20 minutes." FDEs who jump to solutions before understanding the situation get cut.' },
+                        { label: 'C - Constraints inventory', desc: 'Surface the hard constraints before proposing anything: data access restrictions, latency requirements, airgap requirements, existing systems that cannot be replaced. At Palantir, government deployments often have constraints most engineers have never encountered.' },
+                        { label: 'O - Options with tradeoffs', desc: 'Propose 2-3 approaches explicitly and state what each one sacrifices. "Option A is faster to build but depends on internet connectivity. Option B works airgapped but requires 3 weeks of data engineering first." This is how senior engineers think.' },
+                        { label: 'P - Phased delivery plan', desc: 'Break the solution into phases with clear milestones. Phase 1 delivers value to the customer in 2 weeks. Phase 2 adds the harder components. FDE interviewers specifically look for this because it reflects how deployments actually work.' },
+                        { label: 'E - Edge cases and failure modes', desc: 'What happens when the data pipeline breaks? When the customer changes requirements mid-build? When the integration partner goes down? Anticipating failure modes is what separates FDEs from engineers who only build in clean conditions.' },
+                      ],
+                    },
+                    exampleQ: {
+                      question: 'An Airbus manufacturing facility wants to reduce unplanned downtime on their final assembly line. They have sensor data from 400 machines, maintenance logs in PDF format, and a legacy ERP system with no API. How would you approach this?',
+                      strongAnswer: 'First I would spend a day on the floor understanding what "unplanned downtime" actually means to the mechanics, not the managers. Those are usually different problems. Then I would inventory what the sensor data actually looks like in practice, not in the spec, because manufacturing data is almost always messier than described. Given no ERP API, I would build a thin extraction layer using screen-scraping or direct DB access, depending on what security allows. For the PDF maintenance logs, I would run a structured extraction pipeline to pull failure codes, repair timestamps, and part numbers into a queryable format. The predictive layer would start simple: threshold-based alerts on sensor anomalies correlated with historical failure patterns, not a full ML model. Get that working and in front of mechanics in week two. The ML comes in phase two once the data pipeline is proven. I would define success as: the maintenance team acts on at least 60% of alerts and finds them useful. If they ignore the alerts, the system failed regardless of the model accuracy.',
+                      why: 'This answer wins because it starts with user research not architecture, acknowledges real-world data messiness, proposes a simple phase 1 that delivers value fast, and defines success in terms of adoption rather than model metrics.',
+                    },
+                    reading: [
+                      { title: 'Palantir Q4 2025 Shareholder Letter', url: 'https://investors.palantir.com', note: 'Required reading before any Palantir interview. Learn the vocabulary: AIP, ontology, Phase 4 adoption, 137% commercial growth.' },
+                      { title: 'DataInterview: Palantir FDE Guide', url: 'https://www.datainterview.com/blog/palantir-forward-deployed-engineer-interview', note: 'The most specific public guide on the Palantir FDE interview process. Read the Decomposition and Learning round sections carefully.' },
+                      { title: 'Prepfully: Palantir SWE Guide', url: 'https://prepfully.com/interview-guides/palantir-software-engineer', note: 'Covers the full onsite loop including what each round actually tests versus what candidates think it tests.' },
+                    ],
+                  },
+                  'Forward Deployed Product Manager': {
+                    process: [
+                      { stage: 'Recruiter screen', duration: '30 min', what: 'Background, motivation, and a quick gut-check on consulting or product instincts. Expect: "Tell me about a time you managed a difficult stakeholder." Have a crisp, specific story ready.' },
+                      { stage: 'Product case study', duration: '60 min', what: 'A real scenario: "A Fortune 500 logistics company bought our product 6 months ago. Adoption is at 12%. The account is at risk. What do you do?" This tests diagnosis (asking the right questions), prioritization (what matters most), and communication (how do you tell the customer what they do not want to hear).' },
+                      { stage: 'Behavioral deep-dives', duration: '45 min x2', what: 'STAR format. Expect: managing scope creep, delivering bad news, a project that failed and what you learned, a time you disagreed with a stakeholder and what happened. Have at least 6 detailed stories prepared covering these themes.' },
+                      { stage: 'Technical fluency check', duration: '45 min', what: 'Not a coding interview. Expect to discuss: how would you write requirements for an LLM feature, how would you define success metrics for a RAG deployment, what questions would you ask an engineering team to assess timeline feasibility. They want to know you will not embarrass yourself in a room with engineers.' },
+                      { stage: 'Presentation or written exercise', duration: 'Take-home', what: 'Palantir sometimes asks for a written program brief (capped at 4 pages): scope a solution to a real operational problem. Amazon TPM interviews include a similar writing exercise. Clarity and precision matter more than length.' },
+                    ],
+                    framework: {
+                      name: 'DIAGNOSE framework for PM case questions',
+                      steps: [
+                        { label: 'D - Define success', desc: 'Before diagnosing any problem, ask: what does success look like for this customer in concrete terms? Revenue impact? Time savings? Compliance requirement? You cannot prioritize without knowing what you are optimizing for.' },
+                        { label: 'I - Identify the real problem', desc: 'Customers describe symptoms, not root causes. "Our team is not using the product" could mean: the UI is confusing, the training was inadequate, the feature does not match their workflow, or the champion who bought it left the company. Ask until you have the root cause.' },
+                        { label: 'A - Assess your constraints', desc: 'What can actually be built in the time available? What is out of scope? Strong FDPMs set scope explicitly and early. Every hour you spend not saying no to something is an hour the engineering team spends building the wrong thing.' },
+                        { label: 'G - Generate options', desc: 'Propose multiple paths with explicit tradeoffs. "We could build the custom export feature in 3 weeks, or we could configure the existing export to cover 80% of their use case in 3 days. I recommend the latter because the account is at risk and we need a win this week."' },
+                        { label: 'N - Negotiate with all stakeholders', desc: 'The customer wants everything. Engineering wants a clean scope. Leadership wants the account saved. Your job is to find the proposal that all three can live with. State explicitly what each party is giving up.' },
+                        { label: 'O - Own the outcome', desc: 'Write down what you agreed to, send it to all parties, and track it. The written record is your protection when scope creep starts. Every FDPM who has been in a disputed delivery will tell you this step matters more than any other.' },
+                        { label: 'S - Show progress early', desc: 'Do not disappear for 3 weeks and resurface with a finished product. Weekly demos of incremental progress build customer trust and surface misunderstandings early when they are cheap to fix.' },
+                        { label: 'E - Evaluate and close the loop', desc: 'After delivery, run a retrospective with the customer. What worked? What would they change? This feedback directly informs the product roadmap and demonstrates the relationship maturity that leads to expansion revenue.' },
+                      ],
+                    },
+                    exampleQ: {
+                      question: 'You are three weeks into a deployment. The customer\'s CTO tells you the original scope is too limited and they need three additional features to get value from the product. Your engineering team says adding even one feature will push the timeline by four weeks. What do you do?',
+                      strongAnswer: 'First I would get specific: which three features, and what business problem does each one solve? In my experience, when a CTO lists three features two weeks in, at least one of them is a nice-to-have that surfaced because someone in a meeting mentioned it. I would run a quick prioritization: which single feature, if delivered, would unblock the customer\'s primary use case? Then I would go back to engineering with just that one and ask: is there a lighter version we can build in one week that gets them 80% of the value? Almost always the answer is yes. I would present the customer with a revised plan: we deliver the lightweight version of Feature A in week four, which unblocks your core workflow, and we scope Features B and C into a follow-on engagement. I would send a written summary of this agreement within 24 hours. What I would not do is agree to all three features and let the team miss the original timeline without telling anyone.',
+                      why: 'This answer demonstrates scope management (pushes back without saying no), customer empathy (asks what problem they are actually solving), engineering partnership (negotiates a lighter version), and written discipline (documents the agreement).',
+                    },
+                    reading: [
+                      { title: 'IGotAnOffer: OpenAI PM Interview', url: 'https://igotanoffer.com/en/advice/openai-product-manager-interview', note: 'Covers how OpenAI PM interviews are structured and what they weight. The metric and execution questions are relevant to FDPM roles.' },
+                      { title: 'Amazon Leadership Principles', url: 'https://www.amazon.jobs/content/en/our-workplace/leadership-principles', note: 'Customer Obsession, Ownership, and Dive Deep are the three most tested in FDPM interviews. Prepare one specific story for each.' },
+                      { title: 'Prepfully: Palantir PM Guide', url: 'https://prepfully.com/interview-questions/palantir-technologies/product-manager', note: 'Real questions submitted by recent Palantir PM candidates. Use these as a story bank for your behavioral prep.' },
+                    ],
+                  },
+                  'Technical Program Manager': {
+                    process: [
+                      { stage: 'Recruiter screen', duration: '30-45 min', what: 'Role fit, level calibration, and your program management story. Be ready to describe the most complex multi-team program you have owned: how many teams, what the dependencies were, and what the outcome was. This establishes your level.' },
+                      { stage: 'Technical phone screen', duration: '60 min', what: 'System design or architecture dependencies question. Amazon TPM screens specifically test: design an automated shuttle bus scheduling system, or design a system that handles hundreds of time-scheduled transactions. You do not need to code but you need to reason through the technical components clearly.' },
+                      { stage: 'Program management execution round', duration: '60 min', what: 'How do you actually run a program? Expect: "Walk me through how you would launch a new API across 8 engineering teams." They are looking for: dependency mapping, risk identification, communication cadence, and go/no-go criteria. Be specific and systematic.' },
+                      { stage: 'Behavioral loop (Amazon LP questions)', duration: '4-5 rounds at Amazon', what: 'Every Amazon TPM answer is judged through Leadership Principles. The most tested: Ownership ("Tell me about a time you took responsibility for something outside your role"), Dive Deep ("Tell me about a time you found a problem others had missed"), Deliver Results ("Tell me about a time you delivered under pressure"). Prepare 8-10 detailed STAR stories that cover all 14 LPs.' },
+                      { stage: 'Bar Raiser (Amazon)', duration: '60 min', what: 'A senior interviewer from outside the team who can veto the hire. They are looking for signals that you raise the bar: unusually high ownership, unusually deep technical understanding, unusually crisp communication. Do not relax in this round.' },
+                      { stage: 'Written program brief (Amazon)', duration: 'Take-home, max 4 pages', what: 'Scope a solution to a real operational problem. Amazon is explicit: clarity and structure matter more than length. Write in clear paragraphs, not bullet points. State your assumptions. Define success criteria. Describe risks and mitigations.' },
+                    ],
+                    framework: {
+                      name: 'PRISM framework for program execution questions',
+                      steps: [
+                        { label: 'P - Program map first', desc: 'Before anything else, build the dependency map. Pull every team\'s plan. Find where Team A\'s output is Team B\'s input. Find where no one has agreed on the interface. The critical path is almost never what anyone thinks it is. State it explicitly and get alignment on it in week one.' },
+                        { label: 'R - Risk register from day one', desc: 'On day one, write down every assumption the program is making and ask: what happens if this assumption is wrong? That list is your risk register. Stack-rank by probability times impact. The top 3 risks get a mitigation plan. The rest get a monitoring plan. Revisit weekly.' },
+                        { label: 'I - Instrument your program', desc: 'Define how you will know the program is on track before it starts, not after it slips. What is the weekly leading indicator of health? Which team is the most likely bottleneck and how will you know 3 weeks in advance? Google and Amazon interviewers specifically probe this.' },
+                        { label: 'S - Single source of truth', desc: 'Create one document that is the authoritative program state: what is done, what is in progress, what is blocked, what is at risk. Replace every competing spreadsheet with a link to this document. The biggest value a TPM provides is eliminating the coordination overhead that happens when teams have different pictures of reality.' },
+                        { label: 'M - Meeting discipline', desc: 'Every meeting you run has three properties: a pre-distributed agenda, a decision or action item as the output, and a written summary within 24 hours. If a meeting produces no decision and no action, cancel it. Amazon\'s writing culture means decisions made verbally without a written record are not really decisions.' },
+                      ],
+                    },
+                    exampleQ: {
+                      question: 'You are brought onto a program that has already slipped twice. Four engineering teams are involved, each blaming the others for the delays. The VP wants a credible new date in two weeks. What do you do?',
+                      strongAnswer: 'The first thing I do is not give the VP a new date. Every date that has been given so far has been wrong, and giving a new one without understanding why the old ones were wrong just creates the next slip. In week one I do three things: I talk to each team lead individually (not in the group setting where everyone is defensive) and ask them to walk me through what they have, what they are waiting for, and what they cannot do until something else happens. I build the actual dependency map, which I guarantee does not match what anyone thinks it is. And I find the critical path, not the official timeline, by identifying which single blocker is upstream of the most other blocked work. In week two I present the VP with a program brief: here is why it slipped twice (specific root causes, not blame), here is the actual critical path, here is what has to be true for us to hit a new date, and here is a realistic date with the three risks that could break it. That is a credible date. A date without that analysis is a guess.',
+                      why: 'This answer scores well because it refuses to give a date without analysis (demonstrates backbone), focuses on root causes not blame (demonstrates maturity), and describes a concrete 2-week investigation plan rather than a vague process.',
+                    },
+                    reading: [
+                      { title: 'Amazon 14 Leadership Principles', url: 'https://www.amazon.jobs/content/en/our-workplace/leadership-principles', note: 'Memorize all 14. Prepare one specific STAR story for each. At Amazon, every behavioral answer is scored against these explicitly.' },
+                      { title: 'IGotAnOffer: Google TPM Interview', url: 'https://igotanoffer.com/blogs/tech/google-technical-program-manager-interview', note: 'The best free breakdown of how Google structures TPM interviews and what each round is actually testing.' },
+                      { title: 'Mario Gerard: Amazon TPM Questions', url: 'https://www.mariogerard.com/amazon-tpm-interview-questions-with-answers/', note: 'Includes the actual Amazon written program brief exercise with a real prompt. Practice writing a 4-page brief to a real scenario before your interview.' },
+                    ],
+                  },
+                };
+
                 const ROLE_ARTICLES = [
                   {
                     key: 'AI Solutions Architect',
@@ -1059,15 +1188,25 @@ export default function InterviewPrepApp() {
                       </>
                     ) : (
                       <div>
-                        <button className="bg" onClick={()=>setSelectedRole(null)} style={{padding:'5px 12px',fontSize:13,marginBottom:20}}>← All Roles</button>
+                        <button className="bg" onClick={()=>{setSelectedRole(null);setActiveTab('role');}} style={{padding:'5px 12px',fontSize:13,marginBottom:20}}>← All Roles</button>
                         {/* Hero */}
-                        <div style={{display:'flex',alignItems:'flex-start',gap:16,marginBottom:28}}>
-                          <div style={{width:56,height:56,borderRadius:14,background:selected.cfg.bg,border:`1px solid ${selected.cfg.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}></div>
+                        <div style={{display:'flex',alignItems:'flex-start',gap:16,marginBottom:24}}>
+                          <div style={{width:56,height:56,borderRadius:14,background:selected.cfg.bg,border:`1px solid ${selected.cfg.border}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:24}}>{selected.cfg.icon}</div>
                           <div>
                             <h1 style={{fontSize:26,fontWeight:700,color:'#111827',marginBottom:4}}>{selected.key}</h1>
                             <p style={{fontSize:14,color:selected.cfg.color,fontWeight:600}}>{selected.cfg.label}</p>
                           </div>
                         </div>
+                        {/* Tab switcher */}
+                        <div style={{display:'flex',gap:0,marginBottom:24,background:'#F3F4F6',borderRadius:10,padding:4}}>
+                          {[{id:'role',label:'Role Guide'},{id:'interview',label:'Interview Guide'}].map(t=>(
+                            <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{flex:1,padding:'9px',border:'none',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,background:activeTab===t.id?'#fff':'transparent',color:activeTab===t.id?'#111827':'#9CA3AF',boxShadow:activeTab===t.id?'0 1px 3px rgba(0,0,0,0.1)':'none',transition:'all .15s'}}>
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {activeTab==='role' && (<>
                         {/* What is this role */}
                         <div className="card fu" style={{padding:'24px',marginBottom:16}}>
                           <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>What is this role?</p>
@@ -1132,6 +1271,80 @@ export default function InterviewPrepApp() {
                         <button className="bp" onClick={()=>{setSelectedRole(null);navigate('home');}} style={{padding:'13px 28px',fontSize:15}}>
                           Practice {selected.key} interviews →
                         </button>
+                        </>)}
+
+                        {activeTab==='interview' && (()=>{
+                          const guide = INTERVIEW_GUIDES[selected.key];
+                          if(!guide) return <p style={{color:'#9CA3AF',padding:'40px 0',textAlign:'center'}}>Interview guide coming soon.</p>;
+                          return (<>
+                            {/* Interview process */}
+                            <div className="card fu" style={{padding:'24px',marginBottom:16}}>
+                              <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:16}}>The interview process</p>
+                              {guide.process.map((stage,i)=>(
+                                <div key={i} style={{display:'flex',gap:14,marginBottom:i<guide.process.length-1?16:0}}>
+                                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',flexShrink:0}}>
+                                    <div style={{width:28,height:28,borderRadius:'50%',background:selected.cfg.bg,border:`1px solid ${selected.cfg.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:selected.cfg.color}}>{i+1}</div>
+                                    {i<guide.process.length-1&&<div style={{width:1,flex:1,background:'#E5E7EB',margin:'4px 0'}}/>}
+                                  </div>
+                                  <div style={{paddingBottom:i<guide.process.length-1?8:0}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                                      <p style={{fontSize:13,fontWeight:600,color:'#111827'}}>{stage.stage}</p>
+                                      <span style={{fontSize:11,color:'#9CA3AF',background:'#F3F4F6',padding:'2px 8px',borderRadius:10}}>{stage.duration}</span>
+                                    </div>
+                                    <p style={{fontSize:13,color:'#6B7280',lineHeight:1.7}}>{stage.what}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Answer framework */}
+                            <div className="card fu" style={{padding:'24px',marginBottom:16,background:'#F5F3FF',border:`1px solid ${selected.cfg.border}`}}>
+                              <p style={{fontSize:12,fontWeight:700,color:selected.cfg.color,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Answer framework</p>
+                              <p style={{fontSize:14,fontWeight:600,color:'#111827',marginBottom:16}}>{guide.framework.name}</p>
+                              {guide.framework.steps.map((step,i)=>(
+                                <div key={i} style={{marginBottom:12,paddingLeft:12,borderLeft:`2px solid ${selected.cfg.border}`}}>
+                                  <p style={{fontSize:13,fontWeight:600,color:selected.cfg.color,marginBottom:3}}>{step.label}</p>
+                                  <p style={{fontSize:13,color:'#374151',lineHeight:1.7}}>{step.desc}</p>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Example Q&A */}
+                            <div className="card fu" style={{padding:'24px',marginBottom:16}}>
+                              <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Example question and strong answer</p>
+                              <div style={{background:'#F9FAFB',borderRadius:10,padding:'14px 16px',marginBottom:14,borderLeft:`3px solid ${selected.cfg.color}`}}>
+                                <p style={{fontSize:12,fontWeight:600,color:'#9CA3AF',marginBottom:6}}>Question</p>
+                                <p style={{fontSize:14,color:'#111827',lineHeight:1.7,fontStyle:'italic'}}>{guide.exampleQ.question}</p>
+                              </div>
+                              <div style={{background:'#F0FDF4',borderRadius:10,padding:'14px 16px',marginBottom:14,borderLeft:'3px solid #059669'}}>
+                                <p style={{fontSize:12,fontWeight:600,color:'#059669',marginBottom:6}}>Strong answer</p>
+                                <p style={{fontSize:14,color:'#111827',lineHeight:1.7}}>{guide.exampleQ.strongAnswer}</p>
+                              </div>
+                              <div style={{background:'#EFF6FF',borderRadius:10,padding:'12px 14px',borderLeft:'3px solid #2563EB'}}>
+                                <p style={{fontSize:12,fontWeight:600,color:'#2563EB',marginBottom:4}}>Why this scores well</p>
+                                <p style={{fontSize:13,color:'#1E40AF',lineHeight:1.6}}>{guide.exampleQ.why}</p>
+                              </div>
+                            </div>
+
+                            {/* Reading list */}
+                            <div className="card fu" style={{padding:'24px',marginBottom:24}}>
+                              <p style={{fontSize:12,fontWeight:700,color:'#9CA3AF',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:14}}>Recommended reading</p>
+                              {guide.reading.map((r,i)=>(
+                                <div key={i} style={{display:'flex',gap:12,marginBottom:i<guide.reading.length-1?12:0,paddingBottom:i<guide.reading.length-1?12:0,borderBottom:i<guide.reading.length-1?'1px solid #F3F4F6':'none'}}>
+                                  <div style={{width:32,height:32,borderRadius:8,background:selected.cfg.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:14,color:selected.cfg.color,fontWeight:700}}>{i+1}</div>
+                                  <div>
+                                    <a href={r.url} target="_blank" rel="noreferrer" style={{fontSize:13,fontWeight:600,color:selected.cfg.color,textDecoration:'none'}}>{r.title} →</a>
+                                    <p style={{fontSize:12,color:'#6B7280',marginTop:2,lineHeight:1.5}}>{r.note}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <button className="bp" onClick={()=>{setSelectedRole(null);navigate('home');}} style={{padding:'13px 28px',fontSize:15}}>
+                              Practice {selected.key} interviews →
+                            </button>
+                          </>);
+                        })()}
                       </div>
                     )}
                   </div>
